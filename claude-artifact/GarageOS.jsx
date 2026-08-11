@@ -97,6 +97,22 @@ const fmtKES = (n) => `KES ${Number(n || 0).toLocaleString()}`;
 const findName = (arr, id) => arr.find((x) => x.id === Number(id));
 const servicesTotal = (db, ids) => (ids || []).reduce((s, id) => s + (findName(db.services, id)?.price || 0), 0);
 const partsTotal = (db, parts) => (parts || []).reduce((s, p) => s + (findName(db.inventory, p.inventoryId)?.unitPrice || 0) * (p.qty || 0), 0);
+function filterRows(data, term) {
+  if (!term.trim()) return data;
+  const q = term.trim().toLowerCase();
+  return data.filter((row) =>
+    Object.values(row).some((v) => (typeof v === 'string' || typeof v === 'number') && String(v).toLowerCase().includes(q))
+  );
+}
+function SearchBox({ value, onChange, placeholder }) {
+  return (
+    <input
+      value={value} onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder || 'Search…'}
+      style={{ ...inputStyle, maxWidth: 220 }}
+    />
+  );
+}
 
 /* --------------------------------- PRIMITIVES --------------------------------- */
 function Badge({ text }) {
