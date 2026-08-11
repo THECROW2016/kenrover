@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users, Car, Wrench, CalendarDays, Package, FileText,
   UserCog, LogOut, Plus, Pencil, Trash2, X, AlertTriangle,
   CheckCircle2, ChevronRight, ArrowLeft, Printer, ClipboardList, Receipt,
-  Download, Upload, KeyRound, Hammer, CheckCircle
+  Download, Upload, KeyRound, Hammer, CheckCircle, Wallet
 } from 'lucide-react';
 
 /* ---------------------------------- THEME ---------------------------------- */
@@ -90,6 +90,12 @@ function seedData() {
     ],
     rentals: [
       { id: 1, toolId: 3, renterName: 'Daniel Kiptoo', renterCompany: 'Kiptoo Auto Works', renterPhone: '+254 711 222 333', startDate: '2026-08-09', endDate: '2026-08-13', days: 5, dailyRate: 800, total: 4000, status: 'active' },
+    ],
+    expenses: [
+      { id: 1, category: 'Rent', description: 'Workshop rent — August', amount: 45000, date: '2026-08-01' },
+      { id: 2, category: 'Utilities', description: 'Electricity & water', amount: 8500, date: '2026-08-03' },
+      { id: 3, category: 'Salaries', description: 'Staff wages — first half of August', amount: 60000, date: '2026-08-05' },
+      { id: 4, category: 'Supplies', description: 'Shop rags, degreaser, gloves', amount: 3200, date: '2026-08-06' },
     ],
   };
 }
@@ -898,18 +904,29 @@ function StaffPinGate({ fontImport, onUnlock, onBack }) {
 }
 
 /* ---------------------------------- SIDEBAR ---------------------------------- */
-const ADMIN_NAV = [
-  { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { key: 'jobs', label: 'Service Jobs', icon: Wrench },
-  { key: 'appointments', label: 'Appointments', icon: CalendarDays },
-  { key: 'customers', label: 'Customers', icon: Users },
-  { key: 'vehicles', label: 'Vehicles', icon: Car },
-  { key: 'services', label: 'Services', icon: ClipboardList },
-  { key: 'inventory', label: 'Inventory', icon: Package },
-  { key: 'invoices', label: 'Invoices', icon: FileText },
-  { key: 'staff', label: 'Staff', icon: UserCog },
-  { key: 'toolhire', label: 'Tool Hire', icon: Hammer },
-  { key: 'settings', label: 'Settings', icon: KeyRound },
+const ADMIN_NAV_GROUPS = [
+  { label: 'Overview', items: [
+    { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  ] },
+  { label: 'Workshop', items: [
+    { key: 'jobs', label: 'Service Jobs', icon: Wrench },
+    { key: 'appointments', label: 'Appointments', icon: CalendarDays },
+    { key: 'customers', label: 'Customers', icon: Users },
+    { key: 'vehicles', label: 'Vehicles', icon: Car },
+  ] },
+  { label: 'Catalog', items: [
+    { key: 'services', label: 'Services', icon: ClipboardList },
+    { key: 'inventory', label: 'Inventory', icon: Package },
+  ] },
+  { label: 'Finance', items: [
+    { key: 'invoices', label: 'Invoices', icon: FileText },
+    { key: 'expenses', label: 'Expenses', icon: Wallet },
+    { key: 'toolhire', label: 'Tool Hire', icon: Hammer },
+  ] },
+  { label: 'Admin', items: [
+    { key: 'staff', label: 'Staff', icon: UserCog },
+    { key: 'settings', label: 'Settings', icon: KeyRound },
+  ] },
 ];
 const CUST_NAV = [
   { key: 'vehicles', label: 'My Vehicles', icon: Car },
@@ -1300,27 +1317,43 @@ function PrintView({ fontImport, doc, db, onClose }) {
 
 
 function Sidebar({ role, view, setView, onLogout, customerName }) {
-  const items = role === 'admin' ? ADMIN_NAV : CUST_NAV;
+  const isAdmin = role === 'admin';
+  const groups = isAdmin ? ADMIN_NAV_GROUPS : [{ label: null, items: CUST_NAV }];
+  const totalItems = groups.reduce((n, g) => n + g.items.length, 0);
+  // Density scales down a little as more nav items get added, so the sidebar stays tidy rather than growing forever.
+  const dense = totalItems > 9;
+  const itemPad = dense ? 'px-2.5 py-1.5' : 'px-2.5 py-2';
+  const groupGap = dense ? 'mb-3' : 'mb-4';
+
   return (
-    <aside className="w-56 shrink-0 flex flex-col p-3" style={{ background: C.panel + 'e8', backdropFilter: 'blur(4px)', borderRight: `1px solid ${C.border}` }}>
-      <div className="flex items-center px-2 py-3 mb-2 rounded-lg" style={{ background: C.panel2, border: `1px solid ${C.border}` }}>
+    <aside className="w-56 shrink-0 flex flex-col p-3 overflow-y-auto" style={{ background: C.panel + 'e8', backdropFilter: 'blur(4px)', borderRight: `1px solid ${C.border}` }}>
+      <div className="flex items-center px-2 py-3 mb-2 rounded-lg shrink-0" style={{ background: C.panel2, border: `1px solid ${C.border}` }}>
         <img src={LOGO_BADGE} alt="KenRover Garage" style={{ height: 34, filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.5))' }} />
       </div>
-      <div className="text-xs px-2 mb-3 uppercase tracking-wide" style={{ color: C.dim }}>
-        {role === 'admin' ? 'Shop Staff' : customerName || 'Customer'}
+      <div className="text-xs px-2 mb-3 uppercase tracking-wide shrink-0" style={{ color: C.dim }}>
+        {isAdmin ? 'Shop Staff' : customerName || 'Customer'}
       </div>
-      <nav className="flex flex-col gap-1 flex-1">
-        {items.map((it) => (
-          <button
-            key={it.key} onClick={() => setView(it.key)}
-            className="flex items-center gap-2.5 px-2.5 py-2 rounded-md text-sm text-left"
-            style={{ background: view === it.key ? C.accent + '1f' : 'transparent', color: view === it.key ? C.accent2 : C.text }}
-          >
-            <it.icon size={16} /> {it.label}
-          </button>
+      <nav className="flex-1">
+        {groups.map((group, gi) => (
+          <div key={group.label || gi} className={groupGap}>
+            {group.label && (
+              <div className="px-2.5 mb-1 text-xs uppercase tracking-wider" style={{ color: C.dim, opacity: 0.7 }}>{group.label}</div>
+            )}
+            <div className="flex flex-col gap-0.5">
+              {group.items.map((it) => (
+                <button
+                  key={it.key} onClick={() => setView(it.key)}
+                  className={`flex items-center gap-2.5 ${itemPad} rounded-md text-sm text-left`}
+                  style={{ background: view === it.key ? C.accent + '1f' : 'transparent', color: view === it.key ? C.accent2 : C.text }}
+                >
+                  <it.icon size={16} /> {it.label}
+                </button>
+              ))}
+            </div>
+          </div>
         ))}
       </nav>
-      <button onClick={onLogout} className="flex items-center gap-2.5 px-2.5 py-2 rounded-md text-sm hover:opacity-80" style={{ color: C.dim }}>
+      <button onClick={onLogout} className="flex items-center gap-2.5 px-2.5 py-2 rounded-md text-sm hover:opacity-80 shrink-0" style={{ color: C.dim }}>
         <LogOut size={16} /> Switch role
       </button>
     </aside>
@@ -1568,6 +1601,8 @@ function AdminViews({ view, db, addItem, updateItem, deleteItem, setPrintDoc, ad
   if (view === 'dashboard') {
     const activeJobs = db.jobs.filter((j) => j.status === 'pending' || j.status === 'in-progress').length;
     const revenue = db.invoices.filter((i) => i.status === 'paid').reduce((s, i) => s + i.total, 0);
+    const totalExpenses = db.expenses.reduce((s, e) => s + e.amount, 0);
+    const netProfit = revenue - totalExpenses;
     const lowStock = db.inventory.filter((i) => i.quantity <= i.reorderLevel);
     const upcoming = db.appointments.filter((a) => a.status !== 'cancelled' && a.status !== 'completed');
     return (
@@ -1578,6 +1613,8 @@ function AdminViews({ view, db, addItem, updateItem, deleteItem, setPrintDoc, ad
           <StatCard label="Vehicles on file" value={db.vehicles.length} icon={Car} accent={C.info} />
           <StatCard label="Active jobs" value={activeJobs} icon={Wrench} accent={C.accent2} />
           <StatCard label="Revenue (paid)" value={fmtKES(revenue)} icon={FileText} accent={C.success} />
+          <StatCard label="Expenses" value={fmtKES(totalExpenses)} icon={Wallet} accent={C.danger} />
+          <StatCard label="Net profit" value={fmtKES(netProfit)} icon={CheckCircle} accent={netProfit >= 0 ? C.success : C.danger} />
         </div>
         <BayBoard db={db} />
         <div className="grid md:grid-cols-2 gap-5">
@@ -1777,6 +1814,35 @@ function AdminViews({ view, db, addItem, updateItem, deleteItem, setPrintDoc, ad
     return <ToolHireSection db={db} addItem={addItem} updateItem={updateItem} deleteItem={deleteItem} addRental={addRental} />;
   }
 
+  if (view === 'expenses') {
+    return (
+      <CrudSection
+        title="Expenses" subtitle="What it costs to keep the shop running."
+        data={db.expenses}
+        fields={[
+          { key: 'category', label: 'Category', type: 'select', required: true, options: [
+            { value: 'Rent', label: 'Rent' }, { value: 'Utilities', label: 'Utilities' },
+            { value: 'Salaries', label: 'Salaries' }, { value: 'Supplies', label: 'Supplies' },
+            { value: 'Equipment', label: 'Equipment' }, { value: 'Marketing', label: 'Marketing' },
+            { value: 'Other', label: 'Other' },
+          ] },
+          { key: 'description', label: 'Description', wide: true },
+          { key: 'amount', label: 'Amount (KES)', type: 'number', required: true },
+          { key: 'date', label: 'Date', type: 'date', required: true },
+        ]}
+        columns={[
+          { key: 'date', label: 'Date' },
+          { key: 'category', label: 'Category' },
+          { key: 'description', label: 'Description' },
+          { key: 'amount', label: 'Amount', render: (r) => fmtKES(r.amount) },
+        ]}
+        onAdd={(v) => addItem('expenses', v)}
+        onUpdate={(id, v) => updateItem('expenses', id, v)}
+        onDelete={(id) => deleteItem('expenses', id)}
+      />
+    );
+  }
+
   if (view === 'settings') {
     return <SettingsSection db={db} replaceDb={replaceDb} />;
   }
@@ -1815,7 +1881,9 @@ function SettingsSection({ db, replaceDb }) {
         const required = ['customers', 'vehicles', 'staff', 'services', 'inventory', 'jobs', 'appointments', 'invoices'];
         const missing = required.filter((k) => !Array.isArray(parsed[k]));
         if (missing.length) { setImportMsg({ kind: 'error', text: `That file is missing: ${missing.join(', ')}. Nothing was changed.` }); return; }
-        setPendingImport(parsed);
+        // Backups made before Tool Hire / Expenses existed won't have these — default them to empty rather than blocking the restore.
+        const withDefaults = { tools: [], rentals: [], expenses: [], ...parsed };
+        setPendingImport(withDefaults);
       } catch (err) {
         setImportMsg({ kind: 'error', text: "Couldn't read that file — make sure it's a KenRover backup JSON export." });
       }
