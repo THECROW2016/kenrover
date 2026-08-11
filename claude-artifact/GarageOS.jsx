@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   LayoutDashboard, Users, Car, Wrench, CalendarDays, Package, FileText,
   UserCog, LogOut, Plus, Pencil, Trash2, X, AlertTriangle,
-  CheckCircle2, ChevronRight, ArrowLeft, Printer, ClipboardList, Receipt
+  CheckCircle2, ChevronRight, ArrowLeft, Printer, ClipboardList, Receipt, Hammer, CheckCircle
 } from 'lucide-react';
 
 /* ---------------------------------- THEME ---------------------------------- */
@@ -23,6 +23,8 @@ const STATUS_COLORS = {
   pending: C.accent2, 'in-progress': C.info, completed: C.success, delivered: C.dim,
   requested: C.accent2, confirmed: C.info, cancelled: C.danger,
   paid: C.success, unpaid: C.danger,
+  available: C.success, rented: C.accent2, maintenance: C.danger,
+  active: C.info, returned: C.success, overdue: C.danger,
 };
 
 /* --------------------------------- SEED DATA --------------------------------- */
@@ -75,6 +77,17 @@ function seedData() {
     ],
     invoices: [
       { id: 1, jobId: 3, customerId: 1, serviceIds: [2], parts: [{ inventoryId: 3, qty: 1 }], total: 4000, status: 'paid', date: '2026-08-02' },
+    ],
+    tools: [
+      { id: 1, name: 'Engine Hoist (1-tonne)', dailyRate: 2500, condition: 'Good', status: 'available' },
+      { id: 2, name: 'Diagnostic Scanner (OBD-II)', dailyRate: 1500, condition: 'Good', status: 'available' },
+      { id: 3, name: 'Impact Wrench Set', dailyRate: 800, condition: 'Good', status: 'rented' },
+      { id: 4, name: 'Tire Changer Machine', dailyRate: 3000, condition: 'Fair', status: 'available' },
+      { id: 5, name: 'Welding Machine (MIG)', dailyRate: 2000, condition: 'Good', status: 'maintenance' },
+      { id: 6, name: 'Hydraulic Jack (3-tonne)', dailyRate: 600, condition: 'Good', status: 'available' },
+    ],
+    rentals: [
+      { id: 1, toolId: 3, renterName: 'Daniel Kiptoo', renterCompany: 'Kiptoo Auto Works', renterPhone: '+254 711 222 333', startDate: '2026-08-09', endDate: '2026-08-13', days: 5, dailyRate: 800, total: 4000, status: 'active' },
     ],
   };
 }
@@ -443,6 +456,70 @@ function InvoiceForm({ db, initial, onSave, onClose }) {
   );
 }
 
+function RentalForm({ db, initial, onSave, onClose }) {
+  const [toolId, setToolId] = useState(initial?.toolId || '');
+  const [renterName, setRenterName] = useState(initial?.renterName || '');
+  const [renterCompany, setRenterCompany] = useState(initial?.renterCompany || '');
+  const [renterPhone, setRenterPhone] = useState(initial?.renterPhone || '');
+  const [startDate, setStartDate] = useState(initial?.startDate || new Date().toISOString().slice(0, 10));
+  const [endDate, setEndDate] = useState(initial?.endDate || new Date().toISOString().slice(0, 10));
+  const [status, setStatus] = useState(initial?.status || 'active');
+
+  const tool = findName(db.tools, toolId);
+  const rawDays = Math.round((new Date(endDate) - new Date(startDate)) / 86400000) + 1;
+  const days = Math.max(1, isNaN(rawDays) ? 1 : rawDays);
+  const dailyRate = tool?.dailyRate || 0;
+  const total = days * dailyRate;
+
+  return (
+    <div className="fixed inset-0 flex items-center justify-center p-4 z-50" style={{ background: '#000000aa' }}>
+      <div className="w-full max-w-lg rounded-lg p-5 max-h-[88vh] overflow-y-auto" style={{ background: C.panel, border: `1px solid ${C.border}` }}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 style={{ fontFamily: FONT_HEAD, color: C.text }} className="text-xl tracking-wide">{initial ? 'Edit Rental' : 'New Rental'}</h3>
+          <button onClick={onClose}><X size={18} color={C.dim} /></button>
+        </div>
+        <form
+          className="flex flex-col gap-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            onSave({ toolId: Number(toolId), renterName, renterCompany, renterPhone, startDate, endDate, days, dailyRate, total, status });
+          }}
+        >
+          <Field label="Tool">
+            <select style={inputStyle} value={toolId} onChange={(e) => setToolId(e.target.value)} required>
+              <option value="">Select…</option>
+              {db.tools.map((t) => <option key={t.id} value={t.id}>{t.name} — {fmtKES(t.dailyRate)}/day</option>)}
+            </select>
+          </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Renter name"><input style={inputStyle} value={renterName} onChange={(e) => setRenterName(e.target.value)} required /></Field>
+            <Field label="Company / garage"><input style={inputStyle} value={renterCompany} onChange={(e) => setRenterCompany(e.target.value)} /></Field>
+          </div>
+          <Field label="Phone"><input style={inputStyle} value={renterPhone} onChange={(e) => setRenterPhone(e.target.value)} required /></Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Start date"><input type="date" style={inputStyle} value={startDate} onChange={(e) => setStartDate(e.target.value)} required /></Field>
+            <Field label="Expected return"><input type="date" style={inputStyle} value={endDate} onChange={(e) => setEndDate(e.target.value)} required /></Field>
+          </div>
+          <Field label="Status">
+            <select style={inputStyle} value={status} onChange={(e) => setStatus(e.target.value)}>
+              <option value="active">Active (tool is out)</option>
+              <option value="returned">Returned</option>
+            </select>
+          </Field>
+          <div className="p-2.5 rounded-md text-sm" style={{ background: C.accent + '17', border: `1px solid ${C.accent}44` }}>
+            <div className="flex justify-between" style={{ color: C.dim }}><span>{days} day{days === 1 ? '' : 's'} × {fmtKES(dailyRate)}</span></div>
+            <div className="flex justify-between mt-1" style={{ color: C.text, fontWeight: 600 }}><span>Total</span><span style={{ fontFamily: FONT_MONO, color: C.accent2 }}>{fmtKES(total)}</span></div>
+          </div>
+          <div className="flex justify-end gap-2 mt-1">
+            <Button variant="ghost" onClick={onClose}>Cancel</Button>
+            <Button type="submit">Save</Button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 function DataTable({ columns, data, onEdit, onDelete, empty }) {
   if (!data.length) {
     return <div className="p-8 text-center rounded-lg text-sm" style={{ color: C.dim, border: `1px dashed ${C.border}` }}>{empty || 'Nothing here yet.'}</div>;
@@ -553,6 +630,12 @@ export default function GarageOS() {
   const addItem = (col, data) => { const item = { ...data, id: genId(db[col]) }; persist({ ...db, [col]: [...db[col], item] }); };
   const updateItem = (col, id, data) => persist({ ...db, [col]: db[col].map((x) => (x.id === id ? { ...x, ...data, id } : x)) });
   const deleteItem = (col, id) => persist({ ...db, [col]: db[col].filter((x) => x.id !== id) });
+  // Starting a rental also marks the tool as rented; "Mark returned" in ToolHireSection flips it back.
+  const addRental = (vals) => {
+    const item = { ...vals, id: genId(db.rentals) };
+    const tools = db.tools.map((t) => (t.id === vals.toolId ? { ...t, status: 'rented' } : t));
+    persist({ ...db, rentals: [...db.rentals, item], tools });
+  };
 
   const fontImport = (
     <style>{`@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');`}</style>
@@ -613,7 +696,7 @@ export default function GarageOS() {
           />
           <main className="flex-1 p-5 overflow-y-auto">
             {role === 'admin'
-              ? <AdminViews view={adminView} db={db} addItem={addItem} updateItem={updateItem} deleteItem={deleteItem} setPrintDoc={setPrintDoc} />
+              ? <AdminViews view={adminView} db={db} addItem={addItem} updateItem={updateItem} deleteItem={deleteItem} setPrintDoc={setPrintDoc} addRental={addRental} />
               : <CustomerViews view={custView} db={db} customerId={customerId} addItem={addItem} updateItem={updateItem} deleteItem={deleteItem} setPrintDoc={setPrintDoc} />}
           </main>
         </div>
@@ -728,6 +811,7 @@ const ADMIN_NAV = [
   { key: 'inventory', label: 'Inventory', icon: Package },
   { key: 'invoices', label: 'Invoices', icon: FileText },
   { key: 'staff', label: 'Staff', icon: UserCog },
+  { key: 'toolhire', label: 'Tool Hire', icon: Hammer },
 ];
 const CUST_NAV = [
   { key: 'vehicles', label: 'My Vehicles', icon: Car },
@@ -1245,7 +1329,115 @@ function InvoicesSection({ db, addItem, updateItem, deleteItem, setPrintDoc }) {
   );
 }
 
-function AdminViews({ view, db, addItem, updateItem, deleteItem, setPrintDoc }) {
+function ToolHireSection({ db, addItem, updateItem, deleteItem, addRental }) {
+  const [toolModal, setToolModal] = useState(null);
+  const [toolPendingDelete, setToolPendingDelete] = useState(null);
+  const [rentalModal, setRentalModal] = useState(null);
+  const [rentalPendingDelete, setRentalPendingDelete] = useState(null);
+  const [search, setSearch] = useState('');
+
+  const markReturned = (rental) => {
+    updateItem('rentals', rental.id, { status: 'returned' });
+    updateItem('tools', rental.toolId, { status: 'available' });
+  };
+
+  const today = new Date().toISOString().slice(0, 10);
+
+  return (
+    <div>
+      <SectionHeader title="Tool Hire" subtitle="Equipment you rent out to other mechanics and garages, billed per day." />
+
+      <div className="mb-8">
+        <div className="flex items-end justify-between mb-3 flex-wrap gap-2">
+          <h3 style={{ fontFamily: FONT_HEAD, color: C.text }} className="text-lg tracking-wide">Rentals</h3>
+          <div className="flex gap-2 items-center">
+            <SearchBox value={search} onChange={setSearch} placeholder="Search rentals…" />
+            <Button icon={Plus} onClick={() => setRentalModal({ mode: 'add' })}>New rental</Button>
+          </div>
+        </div>
+        <DataTable
+          empty="No rentals yet."
+          columns={[
+            { key: 'tool', label: 'Tool', render: (r) => findName(db.tools, r.toolId)?.name || '—' },
+            { key: 'renter', label: 'Renter', render: (r) => <>{r.renterName}{r.renterCompany ? <span style={{ color: C.dim }}> · {r.renterCompany}</span> : null}</> },
+            { key: 'dates', label: 'Dates', render: (r) => <span style={{ fontFamily: FONT_MONO }}>{r.startDate} → {r.endDate}</span> },
+            { key: 'days', label: 'Days', render: (r) => r.days },
+            { key: 'total', label: 'Total', render: (r) => fmtKES(r.total) },
+            { key: 'status', label: 'Status', render: (r) => <Badge text={r.status === 'active' && r.endDate < today ? 'overdue' : r.status} /> },
+            { key: 'action', label: '', render: (r) => r.status === 'active' ? (
+              <button title="Mark returned" onClick={() => markReturned(r)} className="p-1.5 rounded hover:opacity-70">
+                <CheckCircle size={14} color={C.success} />
+              </button>
+            ) : null },
+          ]}
+          data={filterRows(db.rentals, search)}
+          onEdit={(item) => setRentalModal({ mode: 'edit', item })}
+          onDelete={(id) => setRentalPendingDelete(id)}
+        />
+        {rentalModal && (
+          <RentalForm
+            db={db} initial={rentalModal.item}
+            onClose={() => setRentalModal(null)}
+            onSave={(vals) => {
+              if (rentalModal.mode === 'add') { addRental(vals); }
+              else { updateItem('rentals', rentalModal.item.id, vals); }
+              setRentalModal(null);
+            }}
+          />
+        )}
+        {rentalPendingDelete !== null && (
+          <ConfirmDialog
+            message="Delete this rental record? This can't be undone."
+            onCancel={() => setRentalPendingDelete(null)}
+            onConfirm={() => { deleteItem('rentals', rentalPendingDelete); setRentalPendingDelete(null); }}
+          />
+        )}
+      </div>
+
+      <div>
+        <div className="flex items-end justify-between mb-3 flex-wrap gap-2">
+          <h3 style={{ fontFamily: FONT_HEAD, color: C.text }} className="text-lg tracking-wide">Tools catalog</h3>
+          <Button icon={Plus} onClick={() => setToolModal({ mode: 'add' })}>Add tool</Button>
+        </div>
+        <DataTable
+          empty="No tools yet."
+          columns={[
+            { key: 'name', label: 'Tool' },
+            { key: 'dailyRate', label: 'Daily rate', render: (r) => fmtKES(r.dailyRate) },
+            { key: 'condition', label: 'Condition' },
+            { key: 'status', label: 'Status', render: (r) => <Badge text={r.status} /> },
+          ]}
+          data={db.tools}
+          onEdit={(item) => setToolModal({ mode: 'edit', item })}
+          onDelete={(id) => setToolPendingDelete(id)}
+        />
+        {toolModal && (
+          <FormModal
+            title={toolModal.mode === 'add' ? 'Add Tool' : 'Edit Tool'}
+            fields={[
+              { key: 'name', label: 'Tool name', required: true },
+              { key: 'dailyRate', label: 'Daily rate (KES)', type: 'number', required: true },
+              { key: 'condition', label: 'Condition', type: 'select', options: [{ value: 'Good', label: 'Good' }, { value: 'Fair', label: 'Fair' }, { value: 'Needs Repair', label: 'Needs Repair' }] },
+              { key: 'status', label: 'Status', type: 'select', options: [{ value: 'available', label: 'Available' }, { value: 'rented', label: 'Rented' }, { value: 'maintenance', label: 'Maintenance' }] },
+            ]}
+            initial={toolModal.item}
+            onClose={() => setToolModal(null)}
+            onSave={(vals) => { toolModal.mode === 'add' ? addItem('tools', vals) : updateItem('tools', toolModal.item.id, vals); setToolModal(null); }}
+          />
+        )}
+        {toolPendingDelete !== null && (
+          <ConfirmDialog
+            message="Delete this tool? This can't be undone."
+            onCancel={() => setToolPendingDelete(null)}
+            onConfirm={() => { deleteItem('tools', toolPendingDelete); setToolPendingDelete(null); }}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function AdminViews({ view, db, addItem, updateItem, deleteItem, setPrintDoc, addRental }) {
   if (view === 'dashboard') {
     const activeJobs = db.jobs.filter((j) => j.status === 'pending' || j.status === 'in-progress').length;
     const revenue = db.invoices.filter((i) => i.status === 'paid').reduce((s, i) => s + i.total, 0);
@@ -1452,6 +1644,10 @@ function AdminViews({ view, db, addItem, updateItem, deleteItem, setPrintDoc }) 
         onDelete={(id) => deleteItem('staff', id)}
       />
     );
+  }
+
+  if (view === 'toolhire') {
+    return <ToolHireSection db={db} addItem={addItem} updateItem={updateItem} deleteItem={deleteItem} addRental={addRental} />;
   }
 
   return null;
