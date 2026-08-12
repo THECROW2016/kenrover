@@ -743,9 +743,6 @@ export default function App() {
             <AdminViews view={view} role={role} db={db} addItem={addItem} updateItem={updateItem} deleteItem={deleteItem} setPrintDoc={setPrintDoc} addInvoice={addInvoice} replaceDb={replaceDb} addRental={addRental} />
           </main>
         </div>
-        <div className="text-center text-xs py-2" style={{ color: C.dim, borderTop: `1px solid ${C.border}` }}>
-          Data is saved to this browser only — it won't sync to other devices.
-        </div>
       </div>
     </div>
   );
