@@ -645,12 +645,10 @@ export default function App() {
   const [db, setDb] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saveErr, setSaveErr] = useState(false);
-  const [role, setRole] = useState(null);
-  const [customerId, setCustomerId] = useState(null);
-  const [adminView, setAdminView] = useState('dashboard');
-  const [custView, setCustView] = useState('vehicles');
+  const [role, setRole] = useState(null); // 'admin' | 'staff'
+  const [view, setView] = useState('dashboard');
   const [printDoc, setPrintDoc] = useState(null);
-  const [staffUnlocked, setStaffUnlocked] = useState(() => sessionStorage.getItem('kenrover:staffUnlocked') === '1');
+  const [unlockedRole, setUnlockedRole] = useState(() => sessionStorage.getItem('kenrover:unlockedRole'));
 
   useEffect(() => {
     (async () => {
@@ -704,25 +702,12 @@ export default function App() {
 
   if (!role) return <RoleSelect fontImport={fontImport} onPick={setRole} />;
 
-  if (role === 'admin' && !staffUnlocked) {
+  if (unlockedRole !== role) {
     return (
-      <StaffPinGate
-        fontImport={fontImport}
+      <PinGate
+        fontImport={fontImport} role={role}
         onBack={() => setRole(null)}
-        onUnlock={() => { sessionStorage.setItem('kenrover:staffUnlocked', '1'); setStaffUnlocked(true); }}
-      />
-    );
-  }
-
-  if (role === 'customer' && !customerId) {
-    return (
-      <CustomerPicker
-        fontImport={fontImport} db={db} onPick={setCustomerId} onBack={() => setRole(null)}
-        onCreate={(c) => {
-          const id = genId(db.customers);
-          persist({ ...db, customers: [...db.customers, { ...c, id }] });
-          setCustomerId(id);
-        }}
+        onUnlock={() => { sessionStorage.setItem('kenrover:unlockedRole', role); setUnlockedRole(role); }}
       />
     );
   }
@@ -751,15 +736,11 @@ export default function App() {
         )}
         <div className="flex flex-1 min-h-0">
           <Sidebar
-            role={role} view={role === 'admin' ? adminView : custView}
-            setView={role === 'admin' ? setAdminView : setCustView}
-            onLogout={() => { setRole(null); setCustomerId(null); sessionStorage.removeItem('kenrover:staffUnlocked'); setStaffUnlocked(false); }}
-            customerName={role === 'customer' ? findName(db.customers, customerId)?.name : null}
+            role={role} view={view} setView={setView}
+            onLogout={() => { setRole(null); sessionStorage.removeItem('kenrover:unlockedRole'); setUnlockedRole(null); }}
           />
           <main className="flex-1 p-5 overflow-y-auto">
-            {role === 'admin'
-              ? <AdminViews view={adminView} db={db} addItem={addItem} updateItem={updateItem} deleteItem={deleteItem} setPrintDoc={setPrintDoc} addInvoice={addInvoice} replaceDb={replaceDb} addRental={addRental} />
-              : <CustomerViews view={custView} db={db} customerId={customerId} addItem={addItem} updateItem={updateItem} deleteItem={deleteItem} setPrintDoc={setPrintDoc} />}
+            <AdminViews view={view} role={role} db={db} addItem={addItem} updateItem={updateItem} deleteItem={deleteItem} setPrintDoc={setPrintDoc} addInvoice={addInvoice} replaceDb={replaceDb} addRental={addRental} />
           </main>
         </div>
         <div className="text-center text-xs py-2" style={{ color: C.dim, borderTop: `1px solid ${C.border}` }}>
@@ -803,15 +784,15 @@ function RoleSelect({ fontImport, onPick }) {
         <div className="grid grid-cols-1 gap-3">
           <button onClick={() => onPick('admin')} className="p-4 rounded-lg text-left hover:opacity-90 flex items-center justify-between" style={{ background: C.panel + 'f0', border: `1px solid ${C.border}`, backdropFilter: 'blur(6px)' }}>
             <div>
-              <div style={{ color: C.text, fontFamily: FONT_HEAD }} className="text-lg tracking-wide">Shop Staff</div>
-              <div className="text-xs" style={{ color: C.dim }}>Manage jobs, customers, inventory & billing</div>
+              <div style={{ color: C.text, fontFamily: FONT_HEAD }} className="text-lg tracking-wide">Admin</div>
+              <div className="text-xs" style={{ color: C.dim }}>Full access — jobs, billing, expenses, staff & settings</div>
             </div>
             <ChevronRight size={18} color={C.accent} />
           </button>
-          <button onClick={() => onPick('customer')} className="p-4 rounded-lg text-left hover:opacity-90 flex items-center justify-between" style={{ background: C.panel + 'f0', border: `1px solid ${C.border}`, backdropFilter: 'blur(6px)' }}>
+          <button onClick={() => onPick('staff')} className="p-4 rounded-lg text-left hover:opacity-90 flex items-center justify-between" style={{ background: C.panel + 'f0', border: `1px solid ${C.border}`, backdropFilter: 'blur(6px)' }}>
             <div>
-              <div style={{ color: C.text, fontFamily: FONT_HEAD }} className="text-lg tracking-wide">Customer</div>
-              <div className="text-xs" style={{ color: C.dim }}>Book a visit & track your vehicle's service</div>
+              <div style={{ color: C.text, fontFamily: FONT_HEAD }} className="text-lg tracking-wide">Staff</div>
+              <div className="text-xs" style={{ color: C.dim }}>Day-to-day — jobs, appointments, customers & billing</div>
             </div>
             <ChevronRight size={18} color={C.accent} />
           </button>
@@ -821,62 +802,25 @@ function RoleSelect({ fontImport, onPick }) {
   );
 }
 
-function CustomerPicker({ fontImport, db, onPick, onBack, onCreate }) {
-  const [mode, setMode] = useState('pick');
-  const [form, setForm] = useState({ name: '', phone: '', email: '', address: '' });
-  return (
-    <Shell>
-      {fontImport}
-      <div className="w-full max-w-md">
-        <button onClick={onBack} className="flex items-center gap-1 text-xs mb-4" style={{ color: C.dim }}><ArrowLeft size={13} />Back</button>
-        <h2 style={{ fontFamily: FONT_HEAD, color: C.text }} className="text-2xl tracking-wide mb-4">
-          {mode === 'pick' ? "Who's this?" : 'New customer profile'}
-        </h2>
-        {mode === 'pick' ? (
-          <div className="flex flex-col gap-2">
-            {db.customers.map((c) => (
-              <button key={c.id} onClick={() => onPick(c.id)} className="p-3 rounded-lg text-left flex items-center justify-between hover:opacity-90" style={{ background: C.panel, border: `1px solid ${C.border}` }}>
-                <div>
-                  <div style={{ color: C.text }} className="text-sm font-medium">{c.name}</div>
-                  <div className="text-xs" style={{ color: C.dim }}>{c.phone}</div>
-                </div>
-                <ChevronRight size={16} color={C.dim} />
-              </button>
-            ))}
-            <Button variant="ghost" icon={Plus} onClick={() => setMode('new')}>New customer</Button>
-          </div>
-        ) : (
-          <form className="flex flex-col gap-3" onSubmit={(e) => { e.preventDefault(); onCreate(form); setMode('pick'); }}>
-            <Field label="Full name"><input required style={inputStyle} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
-            <Field label="Phone"><input required style={inputStyle} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></Field>
-            <Field label="Email"><input style={inputStyle} value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></Field>
-            <Field label="Address"><input style={inputStyle} value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></Field>
-            <div className="flex gap-2 justify-end mt-1">
-              <Button variant="ghost" onClick={() => setMode('pick')}>Cancel</Button>
-              <Button type="submit">Create profile</Button>
-            </div>
-          </form>
-        )}
-      </div>
-    </Shell>
-  );
+const DEFAULT_PINS = { admin: '1234', staff: '5678' };
+function getPin(role) {
+  return localStorage.getItem(`kenrover:${role}Pin`) || DEFAULT_PINS[role];
+}
+function setPin(role, value) {
+  localStorage.setItem(`kenrover:${role}Pin`, value);
 }
 
-const DEFAULT_STAFF_PIN = '1234';
-function getStaffPin() {
-  return localStorage.getItem('kenrover:staffPin') || DEFAULT_STAFF_PIN;
-}
-
-function StaffPinGate({ fontImport, onUnlock, onBack }) {
-  const [pin, setPin] = useState('');
+function PinGate({ fontImport, role, onUnlock, onBack }) {
+  const [pin, setPinInput] = useState('');
   const [error, setError] = useState('');
-  const isFirstRun = !localStorage.getItem('kenrover:staffPin');
+  const isFirstRun = !localStorage.getItem(`kenrover:${role}Pin`);
+  const roleLabel = role === 'admin' ? 'Admin' : 'Staff';
 
   const submit = (e) => {
     e.preventDefault();
-    if (pin === getStaffPin()) { onUnlock(); return; }
+    if (pin === getPin(role)) { onUnlock(); return; }
     setError('Wrong PIN. Try again.');
-    setPin('');
+    setPinInput('');
   };
 
   return (
@@ -884,14 +828,14 @@ function StaffPinGate({ fontImport, onUnlock, onBack }) {
       {fontImport}
       <div className="w-full max-w-xs text-center">
         <button onClick={onBack} className="flex items-center gap-1 text-xs mb-4" style={{ color: C.dim }}><ArrowLeft size={13} />Back</button>
-        <h2 style={{ fontFamily: FONT_HEAD, color: C.text }} className="text-2xl tracking-wide mb-1">Staff PIN</h2>
+        <h2 style={{ fontFamily: FONT_HEAD, color: C.text }} className="text-2xl tracking-wide mb-1">{roleLabel} PIN</h2>
         <p className="text-xs mb-5" style={{ color: C.dim }}>
-          {isFirstRun ? <>First time here — the default PIN is <b style={{ color: C.text }}>{DEFAULT_STAFF_PIN}</b>. Change it after signing in.</> : 'Enter your shop PIN to continue.'}
+          {isFirstRun ? <>First time here — the default {roleLabel} PIN is <b style={{ color: C.text }}>{DEFAULT_PINS[role]}</b>. Change it under Settings after signing in.</> : `Enter the ${roleLabel} PIN to continue.`}
         </p>
         <form onSubmit={submit} className="flex flex-col gap-3">
           <input
             autoFocus type="password" inputMode="numeric" value={pin}
-            onChange={(e) => { setPin(e.target.value); setError(''); }}
+            onChange={(e) => { setPinInput(e.target.value); setError(''); }}
             style={{ ...inputStyle, textAlign: 'center', fontSize: 20, letterSpacing: '0.3em' }}
             placeholder="••••"
           />
@@ -905,34 +849,28 @@ function StaffPinGate({ fontImport, onUnlock, onBack }) {
 
 /* ---------------------------------- SIDEBAR ---------------------------------- */
 const ADMIN_NAV_GROUPS = [
-  { label: 'Overview', items: [
-    { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { label: 'Overview', roles: ['admin', 'staff'], items: [
+    { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin', 'staff'] },
   ] },
-  { label: 'Workshop', items: [
-    { key: 'jobs', label: 'Service Jobs', icon: Wrench },
-    { key: 'appointments', label: 'Appointments', icon: CalendarDays },
-    { key: 'customers', label: 'Customers', icon: Users },
-    { key: 'vehicles', label: 'Vehicles', icon: Car },
+  { label: 'Workshop', roles: ['admin', 'staff'], items: [
+    { key: 'jobs', label: 'Service Jobs', icon: Wrench, roles: ['admin', 'staff'] },
+    { key: 'appointments', label: 'Appointments', icon: CalendarDays, roles: ['admin', 'staff'] },
+    { key: 'customers', label: 'Customers', icon: Users, roles: ['admin', 'staff'] },
+    { key: 'vehicles', label: 'Vehicles', icon: Car, roles: ['admin', 'staff'] },
   ] },
-  { label: 'Catalog', items: [
-    { key: 'services', label: 'Services', icon: ClipboardList },
-    { key: 'inventory', label: 'Inventory', icon: Package },
+  { label: 'Catalog', roles: ['admin', 'staff'], items: [
+    { key: 'services', label: 'Services', icon: ClipboardList, roles: ['admin', 'staff'] },
+    { key: 'inventory', label: 'Inventory', icon: Package, roles: ['admin', 'staff'] },
   ] },
-  { label: 'Finance', items: [
-    { key: 'invoices', label: 'Invoices', icon: FileText },
-    { key: 'expenses', label: 'Expenses', icon: Wallet },
-    { key: 'toolhire', label: 'Tool Hire', icon: Hammer },
+  { label: 'Finance', roles: ['admin', 'staff'], items: [
+    { key: 'invoices', label: 'Invoices', icon: FileText, roles: ['admin', 'staff'] },
+    { key: 'expenses', label: 'Expenses', icon: Wallet, roles: ['admin'] },
+    { key: 'toolhire', label: 'Tool Hire', icon: Hammer, roles: ['admin', 'staff'] },
   ] },
-  { label: 'Admin', items: [
-    { key: 'staff', label: 'Staff', icon: UserCog },
-    { key: 'settings', label: 'Settings', icon: KeyRound },
+  { label: 'Admin', roles: ['admin'], items: [
+    { key: 'staff', label: 'Staff', icon: UserCog, roles: ['admin'] },
+    { key: 'settings', label: 'Settings', icon: KeyRound, roles: ['admin'] },
   ] },
-];
-const CUST_NAV = [
-  { key: 'vehicles', label: 'My Vehicles', icon: Car },
-  { key: 'book', label: 'Book Appointment', icon: CalendarDays },
-  { key: 'history', label: 'Service History', icon: Wrench },
-  { key: 'invoices', label: 'My Invoices', icon: FileText },
 ];
 
 /* --------------------------------- PRINT VIEW --------------------------------- */
@@ -1316,9 +1254,11 @@ function PrintView({ fontImport, doc, db, onClose }) {
 }
 
 
-function Sidebar({ role, view, setView, onLogout, customerName }) {
-  const isAdmin = role === 'admin';
-  const groups = isAdmin ? ADMIN_NAV_GROUPS : [{ label: null, items: CUST_NAV }];
+function Sidebar({ role, view, setView, onLogout }) {
+  const groups = ADMIN_NAV_GROUPS
+    .filter((g) => g.roles.includes(role))
+    .map((g) => ({ ...g, items: g.items.filter((it) => it.roles.includes(role)) }))
+    .filter((g) => g.items.length > 0);
   const totalItems = groups.reduce((n, g) => n + g.items.length, 0);
   // Density scales down a little as more nav items get added, so the sidebar stays tidy rather than growing forever.
   const dense = totalItems > 9;
@@ -1331,7 +1271,7 @@ function Sidebar({ role, view, setView, onLogout, customerName }) {
         <img src={LOGO_BADGE} alt="KenRover Garage" style={{ height: 34, filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.5))' }} />
       </div>
       <div className="text-xs px-2 mb-3 uppercase tracking-wide shrink-0" style={{ color: C.dim }}>
-        {isAdmin ? 'Shop Staff' : customerName || 'Customer'}
+        {role === 'admin' ? 'Admin' : 'Staff'}
       </div>
       <nav className="flex-1">
         {groups.map((group, gi) => (
@@ -1597,7 +1537,15 @@ function ToolHireSection({ db, addItem, updateItem, deleteItem, addRental }) {
   );
 }
 
-function AdminViews({ view, db, addItem, updateItem, deleteItem, setPrintDoc, addInvoice, replaceDb, addRental }) {
+function AdminViews({ view, role, db, addItem, updateItem, deleteItem, setPrintDoc, addInvoice, replaceDb, addRental }) {
+  const ADMIN_ONLY_VIEWS = ['expenses', 'staff', 'settings'];
+  if (ADMIN_ONLY_VIEWS.includes(view) && role !== 'admin') {
+    return (
+      <div className="p-8 text-center rounded-lg text-sm" style={{ color: C.dim, border: `1px dashed ${C.border}` }}>
+        This section is only available to Admin accounts.
+      </div>
+    );
+  }
   if (view === 'dashboard') {
     const activeJobs = db.jobs.filter((j) => j.status === 'pending' || j.status === 'in-progress').length;
     const revenue = db.invoices.filter((i) => i.status === 'paid').reduce((s, i) => s + i.total, 0);
@@ -1850,11 +1798,41 @@ function AdminViews({ view, db, addItem, updateItem, deleteItem, setPrintDoc, ad
   return null;
 }
 
-function SettingsSection({ db, replaceDb }) {
+function PinChangeForm({ role }) {
   const [pinMsg, setPinMsg] = useState('');
   const [currentPin, setCurrentPin] = useState('');
   const [newPin, setNewPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
+  const roleLabel = role === 'admin' ? 'Admin' : 'Staff';
+
+  const changePin = (e) => {
+    e.preventDefault();
+    setPinMsg('');
+    if (currentPin !== getPin(role)) { setPinMsg('Current PIN is wrong.'); return; }
+    if (newPin.length < 4) { setPinMsg('New PIN must be at least 4 digits.'); return; }
+    if (newPin !== confirmPin) { setPinMsg("New PINs don't match."); return; }
+    setPin(role, newPin);
+    setCurrentPin(''); setNewPin(''); setConfirmPin('');
+    setPinMsg('PIN updated.');
+  };
+
+  return (
+    <div className="mb-6">
+      <h3 style={{ fontFamily: FONT_HEAD, color: C.text }} className="text-base tracking-wide mb-1">{roleLabel} PIN</h3>
+      <form onSubmit={changePin} className="grid grid-cols-1 sm:grid-cols-3 gap-3 max-w-xl">
+        <Field label="Current PIN"><input type="password" style={inputStyle} value={currentPin} onChange={(e) => setCurrentPin(e.target.value)} /></Field>
+        <Field label="New PIN"><input type="password" style={inputStyle} value={newPin} onChange={(e) => setNewPin(e.target.value)} /></Field>
+        <Field label="Confirm new PIN"><input type="password" style={inputStyle} value={confirmPin} onChange={(e) => setConfirmPin(e.target.value)} /></Field>
+        <div className="sm:col-span-3">
+          <Button type="submit">Update {roleLabel} PIN</Button>
+          {pinMsg && <span className="text-xs ml-3" style={{ color: pinMsg === 'PIN updated.' ? C.success : C.danger }}>{pinMsg}</span>}
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function SettingsSection({ db, replaceDb }) {
   const [importMsg, setImportMsg] = useState(null);
   const [pendingImport, setPendingImport] = useState(null);
   const fileInputRef = React.useRef(null);
@@ -1898,20 +1876,9 @@ function SettingsSection({ db, replaceDb }) {
     setImportMsg({ kind: 'success', text: 'Backup restored.' });
   };
 
-  const changePin = (e) => {
-    e.preventDefault();
-    setPinMsg('');
-    if (currentPin !== getStaffPin()) { setPinMsg('Current PIN is wrong.'); return; }
-    if (newPin.length < 4) { setPinMsg('New PIN must be at least 4 digits.'); return; }
-    if (newPin !== confirmPin) { setPinMsg("New PINs don't match."); return; }
-    localStorage.setItem('kenrover:staffPin', newPin);
-    setCurrentPin(''); setNewPin(''); setConfirmPin('');
-    setPinMsg('PIN updated.');
-  };
-
   return (
     <div>
-      <SectionHeader title="Settings" subtitle="Backups and shop-staff access." />
+      <SectionHeader title="Settings" subtitle="Backups and account access." />
 
       <div className="mb-8">
         <h3 style={{ fontFamily: FONT_HEAD, color: C.text }} className="text-lg tracking-wide mb-1">Backup & restore</h3>
@@ -1929,19 +1896,12 @@ function SettingsSection({ db, replaceDb }) {
       </div>
 
       <div className="mb-4">
-        <h3 style={{ fontFamily: FONT_HEAD, color: C.text }} className="text-lg tracking-wide mb-1">Change staff PIN</h3>
+        <h3 style={{ fontFamily: FONT_HEAD, color: C.text }} className="text-lg tracking-wide mb-1">Account PINs</h3>
         <p className="text-xs mb-3" style={{ color: C.dim }}>
-          This PIN gates the Shop Staff view on this browser. It's a basic deterrent, not real account security — anyone with browser dev tools could bypass it, so don't rely on it for sensitive data.
+          These PINs gate the Admin and Staff views on this browser. They're a basic deterrent, not real account security — anyone with browser dev tools could bypass them, so don't rely on this for sensitive data.
         </p>
-        <form onSubmit={changePin} className="grid grid-cols-1 sm:grid-cols-3 gap-3 max-w-xl">
-          <Field label="Current PIN"><input type="password" style={inputStyle} value={currentPin} onChange={(e) => setCurrentPin(e.target.value)} /></Field>
-          <Field label="New PIN"><input type="password" style={inputStyle} value={newPin} onChange={(e) => setNewPin(e.target.value)} /></Field>
-          <Field label="Confirm new PIN"><input type="password" style={inputStyle} value={confirmPin} onChange={(e) => setConfirmPin(e.target.value)} /></Field>
-          <div className="sm:col-span-3">
-            <Button type="submit">Update PIN</Button>
-            {pinMsg && <span className="text-xs ml-3" style={{ color: pinMsg === 'PIN updated.' ? C.success : C.danger }}>{pinMsg}</span>}
-          </div>
-        </form>
+        <PinChangeForm role="admin" />
+        <PinChangeForm role="staff" />
       </div>
 
       {pendingImport && (
@@ -1956,118 +1916,3 @@ function SettingsSection({ db, replaceDb }) {
   );
 }
 
-/* -------------------------------- CUSTOMER VIEWS -------------------------------- */
-function CustomerViews({ view, db, customerId, addItem, setPrintDoc }) {
-  const myVehicles = db.vehicles.filter((v) => v.customerId === customerId);
-  const myVehicleIds = myVehicles.map((v) => v.id);
-  const myJobs = db.jobs.filter((j) => myVehicleIds.includes(j.vehicleId));
-  const myInvoices = db.invoices.filter((i) => i.customerId === customerId);
-
-  if (view === 'vehicles') {
-    return (
-      <CrudSection
-        title="My Vehicles" subtitle="Add a vehicle to book service for it."
-        data={myVehicles}
-        fields={[
-          { key: 'make', label: 'Make', required: true },
-          { key: 'model', label: 'Model', required: true },
-          { key: 'year', label: 'Year', type: 'number', required: true },
-          { key: 'plate', label: 'Plate number', required: true },
-          { key: 'vin', label: 'VIN', wide: true },
-        ]}
-        columns={[
-          { key: 'plate', label: 'Plate', render: (r) => <span style={{ fontFamily: FONT_MONO }}>{r.plate}</span> },
-          { key: 'vehicle', label: 'Vehicle', render: (r) => `${r.year} ${r.make} ${r.model}` },
-          { key: 'vin', label: 'VIN' },
-        ]}
-        onAdd={(v) => addItem('vehicles', { ...v, customerId })}
-        addLabel="Add vehicle"
-      />
-    );
-  }
-
-  if (view === 'book') {
-    const vehOptions = myVehicles.map((v) => ({ value: v.id, label: `${v.plate} — ${v.make} ${v.model}` }));
-    return (
-      <div>
-        <SectionHeader title="Book Appointment" subtitle="Tell us what your vehicle needs." />
-        {myVehicles.length === 0 ? (
-          <div className="p-6 text-center rounded-lg text-sm" style={{ color: C.dim, border: `1px dashed ${C.border}` }}>
-            Add a vehicle first under "My Vehicles" to book an appointment.
-          </div>
-        ) : (
-          <div className="max-w-lg">
-            <InlineForm
-              submitLabel="Request appointment"
-              fields={[
-                { key: 'vehicleId', label: 'Vehicle', type: 'select', options: vehOptions, required: true },
-                { key: 'date', label: 'Preferred date', type: 'date', required: true },
-                { key: 'time', label: 'Preferred time', type: 'time', required: true },
-                { key: 'serviceType', label: 'Service type', required: true },
-                { key: 'notes', label: 'Notes', wide: true, type: 'textarea' },
-              ]}
-              onSave={(v) => addItem('appointments', { ...v, vehicleId: Number(v.vehicleId), customerId, status: 'requested' })}
-            />
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  if (view === 'history') {
-    return (
-      <div>
-        <SectionHeader title="Service History" subtitle="Status of every job on your vehicles." />
-        <DataTable
-          empty="No service jobs yet."
-          columns={[
-            { key: 'vehicle', label: 'Vehicle', render: (r) => findName(db.vehicles, r.vehicleId)?.plate || '—' },
-            { key: 'description', label: 'Work' },
-            { key: 'createdDate', label: 'Opened' },
-            { key: 'cost', label: 'Cost', render: (r) => fmtKES(r.cost) },
-            { key: 'status', label: 'Status', render: (r) => <Badge text={r.status} /> },
-            { key: 'print', label: '', render: (r) => (
-              <button title="Print job card" onClick={() => setPrintDoc({ type: 'jobcard', id: r.id })} className="p-1.5 rounded hover:opacity-70">
-                <Printer size={14} color={C.dim} />
-              </button>
-            ) },
-          ]}
-          data={myJobs}
-        />
-      </div>
-    );
-  }
-
-  if (view === 'invoices') {
-    return (
-      <div>
-        <SectionHeader title="My Invoices" subtitle="Billing history for your account." />
-        <DataTable
-          empty="No invoices yet."
-          columns={[
-            { key: 'id', label: 'Invoice #', render: (r) => <span style={{ fontFamily: FONT_MONO }}>INV-{String(r.id).padStart(4, '0')}</span> },
-            { key: 'vehicle', label: 'Vehicle', render: (r) => findName(db.vehicles, findName(db.jobs, r.jobId)?.vehicleId)?.plate || '—' },
-            { key: 'date', label: 'Date' },
-            { key: 'total', label: 'Total', render: (r) => fmtKES(r.total) },
-            { key: 'status', label: 'Status', render: (r) => <Badge text={r.status} /> },
-            { key: 'print', label: '', render: (r) => (
-              <div className="flex justify-end gap-1">
-                <button title="Print invoice" onClick={() => setPrintDoc({ type: 'invoice', id: r.id })} className="p-1.5 rounded hover:opacity-70">
-                  <Printer size={14} color={C.dim} />
-                </button>
-                {r.status === 'paid' && (
-                  <button title="Print receipt" onClick={() => setPrintDoc({ type: 'receipt', id: r.id })} className="p-1.5 rounded hover:opacity-70">
-                    <Receipt size={14} color={C.success} />
-                  </button>
-                )}
-              </div>
-            ) },
-          ]}
-          data={myInvoices}
-        />
-      </div>
-    );
-  }
-
-  return null;
-}
