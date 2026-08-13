@@ -41,14 +41,16 @@ For anything handling real customer payment data or needing accountability per i
 
 ## Features
 
+- **Starts empty.** There's no demo/sample data — the app opens with nothing in it so the first things you add are your own. Admin → Settings has a **"Clear all data"** button any time you want to wipe back to that same clean state (export a backup first if there's anything worth keeping).
 - **Dashboard** — live stats, a "bay board" of active jobs, low-stock alerts, upcoming appointments, revenue/expenses/net profit.
+- **Analytics** (Admin only) — automated business-intelligence view: revenue vs. expenses over the last 6 months, top services by revenue, expense breakdown by category, and a plain-language "automated insights" panel that flags things like low stock, unpaid invoices, overdue rentals, and your top customer — all computed live from whatever data you've entered, no setup required.
 - **Customers, Vehicles, Staff, Services** — full CRUD with search.
 - **Service Jobs** — a services checklist that auto-totals the job cost; status pipeline (pending → in-progress → completed → delivered).
 - **Appointments** — booking with status tracking.
 - **Inventory** — stock levels with low-stock highlighting; **parts are automatically deducted from stock when an invoice using them is created.**
 - **Invoices** — services + parts, discount and tax-rate fields, auto-computed totals, paid/unpaid status.
 - **Tool Hire** — a tools catalog and rental tracking for equipment lent out to other mechanics/garages, billed per day.
-- **Expenses** — categorized cost tracking (Admin only), feeding into the dashboard's net profit figure.
+- **Expenses** — categorized cost tracking (Admin only), feeding into the dashboard's net profit figure and Analytics.
 - **Printing** — job cards, invoices, and receipts generate a standalone printable HTML document. It opens in a new tab and triggers your browser's print dialog when possible; if pop-ups are blocked, it downloads the file instead so you can open and print it yourself.
 - **Backup & restore** — export the full dataset as JSON from Settings, and restore from a previous export.
 

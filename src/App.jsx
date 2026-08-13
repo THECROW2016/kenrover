@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users, Car, Wrench, CalendarDays, Package, FileText,
   UserCog, LogOut, Plus, Pencil, Trash2, X, AlertTriangle,
   CheckCircle2, ChevronRight, ArrowLeft, Printer, ClipboardList, Receipt,
-  Download, Upload, KeyRound, Hammer, CheckCircle, Wallet
+  Download, Upload, KeyRound, Hammer, CheckCircle, Wallet, TrendingUp
 } from 'lucide-react';
 
 /* ---------------------------------- THEME ---------------------------------- */
@@ -31,72 +31,20 @@ const STATUS_COLORS = {
 
 /* --------------------------------- SEED DATA --------------------------------- */
 function seedData() {
+  // Starts empty — this is a clean slate for your own shop data.
+  // (Use Settings -> Clear all data any time you want to wipe back to this empty state.)
   return {
-    customers: [
-      { id: 1, name: 'Amara Otieno', phone: '+254 712 345 678', email: 'amara.otieno@example.com', address: 'Kilimani, Nairobi' },
-      { id: 2, name: 'Brian Mwangi', phone: '+254 722 987 654', email: 'brian.mwangi@example.com', address: 'Westlands, Nairobi' },
-      { id: 3, name: 'Cynthia Wanjiru', phone: '+254 733 111 222', email: 'cynthia.w@example.com', address: 'Karen, Nairobi' },
-    ],
-    vehicles: [
-      { id: 1, customerId: 1, make: 'Toyota', model: 'Land Cruiser Prado', year: 2019, plate: 'KDA 123A', vin: 'JTMHV05J7K5000001' },
-      { id: 2, customerId: 2, make: 'Subaru', model: 'Forester', year: 2021, plate: 'KDB 456B', vin: 'JF1SJ5LC8ME000002' },
-      { id: 3, customerId: 1, make: 'Mazda', model: 'Demio', year: 2017, plate: 'KCP 789C', vin: 'JMZDE1W7XH0000003' },
-      { id: 4, customerId: 3, make: 'Honda', model: 'CR-V', year: 2020, plate: 'KDD 321D', vin: 'JHLRE4H70FC000004' },
-    ],
-    staff: [
-      { id: 1, name: 'Peter Kamau', role: 'Lead Mechanic', phone: '+254 700 111 000', specialty: 'Engine & Diagnostics' },
-      { id: 2, name: 'Grace Achieng', role: 'Mechanic', phone: '+254 700 222 000', specialty: 'Brakes & Suspension' },
-      { id: 3, name: 'Samuel Njoroge', role: 'Service Advisor', phone: '+254 700 333 000', specialty: 'Customer Relations' },
-    ],
-    services: [
-      { id: 1, name: 'Full Service', price: 8000 },
-      { id: 2, name: 'Oil Change', price: 2500 },
-      { id: 3, name: 'Brake Pad Replacement', price: 4500 },
-      { id: 4, name: 'Brake Inspection', price: 1000 },
-      { id: 5, name: 'Wheel Alignment', price: 3000 },
-      { id: 6, name: 'Wheel Balancing', price: 2000 },
-      { id: 7, name: 'Diagnostic Check', price: 1500 },
-      { id: 8, name: 'AC Service & Regas', price: 3500 },
-      { id: 9, name: 'Battery Replacement (labor)', price: 1200 },
-      { id: 10, name: 'Tire Rotation', price: 1000 },
-      { id: 11, name: 'Clutch Replacement', price: 12000 },
-      { id: 12, name: 'Suspension Check', price: 2000 },
-    ],
-    inventory: [
-      { id: 1, partName: 'Engine Oil 5W-30 (5L)', sku: 'OIL-5W30-5L', quantity: 14, unitPrice: 4200, reorderLevel: 5 },
-      { id: 2, partName: 'Brake Pads (Front Set)', sku: 'BRK-PAD-F', quantity: 3, unitPrice: 6800, reorderLevel: 4 },
-      { id: 3, partName: 'Air Filter', sku: 'FLT-AIR-01', quantity: 20, unitPrice: 1500, reorderLevel: 6 },
-      { id: 4, partName: 'Battery 12V 65Ah', sku: 'BAT-65AH', quantity: 2, unitPrice: 12500, reorderLevel: 3 },
-    ],
-    jobs: [
-      { id: 1, vehicleId: 1, customerId: 1, description: 'Full service + brake pad replacement', status: 'in-progress', assignedStaffId: 2, serviceIds: [1, 3], cost: 12500, createdDate: '2026-08-05' },
-      { id: 2, vehicleId: 2, customerId: 2, description: 'Diagnostic check - engine warning light', status: 'pending', assignedStaffId: 1, serviceIds: [7], cost: 1500, createdDate: '2026-08-07' },
-      { id: 3, vehicleId: 3, customerId: 1, description: 'Oil change & filter replacement', status: 'completed', assignedStaffId: 2, serviceIds: [2], cost: 2500, createdDate: '2026-08-01' },
-    ],
-    appointments: [
-      { id: 1, customerId: 2, vehicleId: 2, date: '2026-08-12', time: '09:00', serviceType: 'Diagnostic', status: 'confirmed', notes: 'Check engine light intermittent' },
-      { id: 2, customerId: 3, vehicleId: 4, date: '2026-08-14', time: '11:30', serviceType: 'General Service', status: 'requested', notes: 'First visit' },
-    ],
-    invoices: [
-      { id: 1, jobId: 3, customerId: 1, serviceIds: [2], parts: [{ inventoryId: 3, qty: 1 }], total: 4000, status: 'paid', date: '2026-08-02' },
-    ],
-    tools: [
-      { id: 1, name: 'Engine Hoist (1-tonne)', dailyRate: 2500, condition: 'Good', status: 'available' },
-      { id: 2, name: 'Diagnostic Scanner (OBD-II)', dailyRate: 1500, condition: 'Good', status: 'available' },
-      { id: 3, name: 'Impact Wrench Set', dailyRate: 800, condition: 'Good', status: 'rented' },
-      { id: 4, name: 'Tire Changer Machine', dailyRate: 3000, condition: 'Fair', status: 'available' },
-      { id: 5, name: 'Welding Machine (MIG)', dailyRate: 2000, condition: 'Good', status: 'maintenance' },
-      { id: 6, name: 'Hydraulic Jack (3-tonne)', dailyRate: 600, condition: 'Good', status: 'available' },
-    ],
-    rentals: [
-      { id: 1, toolId: 3, renterName: 'Daniel Kiptoo', renterCompany: 'Kiptoo Auto Works', renterPhone: '+254 711 222 333', startDate: '2026-08-09', endDate: '2026-08-13', days: 5, dailyRate: 800, total: 4000, status: 'active' },
-    ],
-    expenses: [
-      { id: 1, category: 'Rent', description: 'Workshop rent — August', amount: 45000, date: '2026-08-01' },
-      { id: 2, category: 'Utilities', description: 'Electricity & water', amount: 8500, date: '2026-08-03' },
-      { id: 3, category: 'Salaries', description: 'Staff wages — first half of August', amount: 60000, date: '2026-08-05' },
-      { id: 4, category: 'Supplies', description: 'Shop rags, degreaser, gloves', amount: 3200, date: '2026-08-06' },
-    ],
+    customers: [],
+    vehicles: [],
+    staff: [],
+    services: [],
+    inventory: [],
+    jobs: [],
+    appointments: [],
+    invoices: [],
+    tools: [],
+    rentals: [],
+    expenses: [],
   };
 }
 
@@ -105,6 +53,20 @@ const fmtKES = (n) => `KES ${Number(n || 0).toLocaleString()}`;
 const findName = (arr, id) => arr.find((x) => x.id === Number(id));
 const servicesTotal = (db, ids) => (ids || []).reduce((s, id) => s + (findName(db.services, id)?.price || 0), 0);
 const partsTotal = (db, parts) => (parts || []).reduce((s, p) => s + (findName(db.inventory, p.inventoryId)?.unitPrice || 0) * (p.qty || 0), 0);
+const monthKey = (dateStr) => (dateStr ? dateStr.slice(0, 7) : '');
+function lastNMonths(n) {
+  const out = [];
+  const now = new Date();
+  for (let i = n - 1; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    out.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+  }
+  return out;
+}
+function monthLabel(key) {
+  const [y, m] = key.split('-').map(Number);
+  return new Date(y, m - 1, 1).toLocaleString('en-US', { month: 'short' });
+}
 function filterRows(data, term) {
   if (!term.trim()) return data;
   const q = term.trim().toLowerCase();
@@ -119,6 +81,52 @@ function SearchBox({ value, onChange, placeholder }) {
       placeholder={placeholder || 'Search…'}
       style={{ ...inputStyle, maxWidth: 220 }}
     />
+  );
+}
+
+function MonthlyBarChart({ months, revenueByMonth, expenseByMonth }) {
+  const max = Math.max(1, ...months.map((m) => Math.max(revenueByMonth[m] || 0, expenseByMonth[m] || 0)));
+  return (
+    <div>
+      <div className="flex items-end justify-between gap-3" style={{ height: 140 }}>
+        {months.map((m) => {
+          const rev = revenueByMonth[m] || 0;
+          const exp = expenseByMonth[m] || 0;
+          return (
+            <div key={m} className="flex-1 flex flex-col items-center justify-end h-full">
+              <div className="flex items-end gap-1" style={{ height: '100%' }}>
+                <div title={`Revenue: ${fmtKES(rev)}`} style={{ width: 12, height: `${Math.max(2, (rev / max) * 100)}%`, background: C.success, borderRadius: 2 }} />
+                <div title={`Expenses: ${fmtKES(exp)}`} style={{ width: 12, height: `${Math.max(2, (exp / max) * 100)}%`, background: C.danger, borderRadius: 2 }} />
+              </div>
+              <div className="text-xs mt-1.5" style={{ color: C.dim, fontFamily: FONT_MONO }}>{monthLabel(m)}</div>
+            </div>
+          );
+        })}
+      </div>
+      <div className="flex gap-4 justify-center mt-3 text-xs" style={{ color: C.dim }}>
+        <span className="flex items-center gap-1.5"><span style={{ width: 8, height: 8, borderRadius: 2, background: C.success, display: 'inline-block' }} />Revenue</span>
+        <span className="flex items-center gap-1.5"><span style={{ width: 8, height: 8, borderRadius: 2, background: C.danger, display: 'inline-block' }} />Expenses</span>
+      </div>
+    </div>
+  );
+}
+
+function BarList({ items, color }) {
+  const max = Math.max(1, ...items.map((i) => i.value));
+  return (
+    <div className="flex flex-col gap-2.5">
+      {items.map((it, idx) => (
+        <div key={idx}>
+          <div className="flex justify-between text-xs mb-1">
+            <span style={{ color: C.text }}>{it.label}</span>
+            <span style={{ color: C.dim, fontFamily: FONT_MONO }}>{it.sub}</span>
+          </div>
+          <div style={{ background: C.panel2, borderRadius: 4, height: 7 }}>
+            <div style={{ width: `${(it.value / max) * 100}%`, background: color || C.accent, height: '100%', borderRadius: 4 }} />
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -680,6 +688,7 @@ export default function App() {
     persist({ ...db, invoices: [...db.invoices, item], inventory });
   };
   const replaceDb = (next) => persist(next);
+  const clearAllData = () => persist(seedData());
   // Starting a rental also marks the tool as rented; "Mark returned" in ToolHireSection flips it back.
   const addRental = (vals) => {
     const item = { ...vals, id: genId(db.rentals) };
@@ -740,7 +749,7 @@ export default function App() {
             onLogout={() => { setRole(null); sessionStorage.removeItem('kenrover:unlockedRole'); setUnlockedRole(null); }}
           />
           <main className="flex-1 p-5 overflow-y-auto">
-            <AdminViews view={view} role={role} db={db} addItem={addItem} updateItem={updateItem} deleteItem={deleteItem} setPrintDoc={setPrintDoc} addInvoice={addInvoice} replaceDb={replaceDb} addRental={addRental} />
+            <AdminViews view={view} role={role} db={db} addItem={addItem} updateItem={updateItem} deleteItem={deleteItem} setPrintDoc={setPrintDoc} addInvoice={addInvoice} replaceDb={replaceDb} addRental={addRental} clearAllData={clearAllData} />
           </main>
         </div>
       </div>
@@ -848,6 +857,7 @@ function PinGate({ fontImport, role, onUnlock, onBack }) {
 const ADMIN_NAV_GROUPS = [
   { label: 'Overview', roles: ['admin', 'staff'], items: [
     { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin', 'staff'] },
+    { key: 'analytics', label: 'Analytics', icon: TrendingUp, roles: ['admin'] },
   ] },
   { label: 'Workshop', roles: ['admin', 'staff'], items: [
     { key: 'jobs', label: 'Service Jobs', icon: Wrench, roles: ['admin', 'staff'] },
@@ -1534,8 +1544,122 @@ function ToolHireSection({ db, addItem, updateItem, deleteItem, addRental }) {
   );
 }
 
-function AdminViews({ view, role, db, addItem, updateItem, deleteItem, setPrintDoc, addInvoice, replaceDb, addRental }) {
-  const ADMIN_ONLY_VIEWS = ['expenses', 'staff', 'settings'];
+function AnalyticsSection({ db }) {
+  const months = lastNMonths(6);
+  const revenueByMonth = {}; const expenseByMonth = {};
+  months.forEach((m) => { revenueByMonth[m] = 0; expenseByMonth[m] = 0; });
+  const paidInvoices = db.invoices.filter((i) => i.status === 'paid');
+  paidInvoices.forEach((i) => { const k = monthKey(i.date); if (k in revenueByMonth) revenueByMonth[k] += i.total; });
+  db.expenses.forEach((e) => { const k = monthKey(e.date); if (k in expenseByMonth) expenseByMonth[k] += e.amount; });
+
+  const totalRevenue = paidInvoices.reduce((s, i) => s + i.total, 0);
+  const totalExpenses = db.expenses.reduce((s, e) => s + e.amount, 0);
+  const netProfit = totalRevenue - totalExpenses;
+  const avgInvoice = paidInvoices.length ? Math.round(totalRevenue / paidInvoices.length) : 0;
+
+  const serviceRevenue = {};
+  paidInvoices.forEach((inv) => {
+    (inv.serviceIds || []).forEach((id) => {
+      const s = findName(db.services, id);
+      if (s) serviceRevenue[id] = (serviceRevenue[id] || 0) + s.price;
+    });
+  });
+  const topServices = Object.entries(serviceRevenue)
+    .map(([id, val]) => ({ label: findName(db.services, id)?.name || 'Unknown', value: val, sub: fmtKES(val) }))
+    .sort((a, b) => b.value - a.value).slice(0, 5);
+
+  const expenseByCategory = {};
+  db.expenses.forEach((e) => { expenseByCategory[e.category] = (expenseByCategory[e.category] || 0) + e.amount; });
+  const expenseList = Object.entries(expenseByCategory)
+    .map(([cat, val]) => ({ label: cat, value: val, sub: fmtKES(val) }))
+    .sort((a, b) => b.value - a.value);
+
+  const lowStock = db.inventory.filter((i) => i.quantity <= i.reorderLevel);
+  const unpaid = db.invoices.filter((i) => i.status === 'unpaid');
+  const unpaidTotal = unpaid.reduce((s, i) => s + i.total, 0);
+  const today = new Date().toISOString().slice(0, 10);
+  const overdueRentals = db.rentals.filter((r) => r.status === 'active' && r.endDate < today).length;
+
+  const customerSpend = {};
+  paidInvoices.forEach((inv) => { if (inv.customerId) customerSpend[inv.customerId] = (customerSpend[inv.customerId] || 0) + inv.total; });
+  const topCustomerEntry = Object.entries(customerSpend).sort((a, b) => b[1] - a[1])[0];
+  const topCustomer = topCustomerEntry ? findName(db.customers, topCustomerEntry[0]) : null;
+
+  const insights = [];
+  if (lowStock.length > 0) insights.push(`${lowStock.length} inventory item${lowStock.length > 1 ? 's are' : ' is'} low on stock — worth reordering soon.`);
+  if (unpaid.length > 0) insights.push(`${fmtKES(unpaidTotal)} is still unpaid across ${unpaid.length} invoice${unpaid.length > 1 ? 's' : ''}.`);
+  if (overdueRentals > 0) insights.push(`${overdueRentals} tool rental${overdueRentals > 1 ? 's are' : ' is'} overdue for return.`);
+  if (topCustomer) insights.push(`${topCustomer.name} is your top customer by spend, at ${fmtKES(topCustomerEntry[1])}.`);
+  if (topServices[0]) insights.push(`${topServices[0].label} is your highest-earning service at ${topServices[0].sub}.`);
+  if (netProfit < 0 && totalExpenses > 0) insights.push(`Expenses currently exceed revenue by ${fmtKES(Math.abs(netProfit))}.`);
+
+  const hasAnyData = db.invoices.length > 0 || db.expenses.length > 0;
+
+  return (
+    <div>
+      <SectionHeader title="Analytics" subtitle="Automated insights, generated live from your shop's data." />
+      {!hasAnyData ? (
+        <div className="p-8 text-center rounded-lg text-sm" style={{ color: C.dim, border: `1px dashed ${C.border}` }}>
+          No data yet — charts and insights will populate automatically as you add jobs, invoices, and expenses.
+        </div>
+      ) : (
+        <>
+          <div className="grid gap-3 mb-6" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))' }}>
+            <StatCard label="Revenue (paid)" value={fmtKES(totalRevenue)} icon={FileText} accent={C.success} />
+            <StatCard label="Expenses" value={fmtKES(totalExpenses)} icon={Wallet} accent={C.danger} />
+            <StatCard label="Net profit" value={fmtKES(netProfit)} icon={CheckCircle} accent={netProfit >= 0 ? C.success : C.danger} />
+            <StatCard label="Avg invoice" value={fmtKES(avgInvoice)} icon={Receipt} accent={C.info} />
+          </div>
+
+          <div className="mb-6">
+            <div className="text-xs uppercase tracking-wide mb-2" style={{ color: C.dim }}>Revenue vs expenses — last 6 months</div>
+            <div className="p-4 rounded-lg" style={{ background: C.panel, border: `1px solid ${C.border}` }}>
+              <MonthlyBarChart months={months} revenueByMonth={revenueByMonth} expenseByMonth={expenseByMonth} />
+            </div>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-5 mb-6">
+            <div>
+              <div className="text-xs uppercase tracking-wide mb-2" style={{ color: C.dim }}>Top services by revenue</div>
+              {topServices.length ? (
+                <div className="p-4 rounded-lg" style={{ background: C.panel, border: `1px solid ${C.border}` }}><BarList items={topServices} /></div>
+              ) : (
+                <div className="p-4 text-sm rounded-lg" style={{ color: C.dim, border: `1px dashed ${C.border}` }}>No paid invoices with services yet.</div>
+              )}
+            </div>
+            <div>
+              <div className="text-xs uppercase tracking-wide mb-2" style={{ color: C.dim }}>Expenses by category</div>
+              {expenseList.length ? (
+                <div className="p-4 rounded-lg" style={{ background: C.panel, border: `1px solid ${C.border}` }}><BarList items={expenseList} color={C.danger} /></div>
+              ) : (
+                <div className="p-4 text-sm rounded-lg" style={{ color: C.dim, border: `1px dashed ${C.border}` }}>No expenses logged yet.</div>
+              )}
+            </div>
+          </div>
+
+          <div>
+            <div className="text-xs uppercase tracking-wide mb-2" style={{ color: C.dim }}>Automated insights</div>
+            {insights.length ? (
+              <div className="flex flex-col gap-2">
+                {insights.map((txt, i) => (
+                  <div key={i} className="p-3 rounded-md text-sm flex items-start gap-2" style={{ background: C.panel, border: `1px solid ${C.border}` }}>
+                    <CheckCircle size={14} color={C.accent2} style={{ marginTop: 2, flexShrink: 0 }} />
+                    <span style={{ color: C.text }}>{txt}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-4 text-sm rounded-lg" style={{ color: C.dim, border: `1px dashed ${C.border}` }}>Nothing to flag right now — everything looks healthy.</div>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function AdminViews({ view, role, db, addItem, updateItem, deleteItem, setPrintDoc, addInvoice, replaceDb, addRental, clearAllData }) {
+  const ADMIN_ONLY_VIEWS = ['expenses', 'staff', 'settings', 'analytics'];
   if (ADMIN_ONLY_VIEWS.includes(view) && role !== 'admin') {
     return (
       <div className="p-8 text-center rounded-lg text-sm" style={{ color: C.dim, border: `1px dashed ${C.border}` }}>
@@ -1789,7 +1913,11 @@ function AdminViews({ view, role, db, addItem, updateItem, deleteItem, setPrintD
   }
 
   if (view === 'settings') {
-    return <SettingsSection db={db} replaceDb={replaceDb} />;
+    return <SettingsSection db={db} replaceDb={replaceDb} clearAllData={clearAllData} />;
+  }
+
+  if (view === 'analytics') {
+    return <AnalyticsSection db={db} />;
   }
 
   return null;
@@ -1829,9 +1957,11 @@ function PinChangeForm({ role }) {
   );
 }
 
-function SettingsSection({ db, replaceDb }) {
+function SettingsSection({ db, replaceDb, clearAllData }) {
   const [importMsg, setImportMsg] = useState(null);
   const [pendingImport, setPendingImport] = useState(null);
+  const [confirmingClear, setConfirmingClear] = useState(false);
+  const [clearedMsg, setClearedMsg] = useState(false);
   const fileInputRef = React.useRef(null);
 
   const exportBackup = () => {
@@ -1901,12 +2031,29 @@ function SettingsSection({ db, replaceDb }) {
         <PinChangeForm role="staff" />
       </div>
 
+      <div className="mb-8">
+        <h3 style={{ fontFamily: FONT_HEAD, color: C.danger }} className="text-lg tracking-wide mb-1">Danger zone</h3>
+        <p className="text-xs mb-3" style={{ color: C.dim }}>
+          Wipe every customer, vehicle, job, invoice, expense, tool, and rental in this workspace back to a clean, empty state. Export a backup first if there's anything worth keeping.
+        </p>
+        <Button variant="danger" icon={Trash2} onClick={() => setConfirmingClear(true)}>Clear all data</Button>
+        {clearedMsg && <div className="text-xs mt-2" style={{ color: C.success }}>All data cleared. Start adding your own whenever you're ready.</div>}
+      </div>
+
       {pendingImport && (
         <ConfirmDialog
           message="Restoring this backup will replace all current data in this browser. This can't be undone."
           confirmLabel="Restore"
           onCancel={() => setPendingImport(null)}
           onConfirm={confirmImport}
+        />
+      )}
+      {confirmingClear && (
+        <ConfirmDialog
+          message="This permanently deletes every customer, vehicle, job, invoice, expense, tool, and rental. There is no undo — export a backup first if you want a copy."
+          confirmLabel="Clear everything"
+          onCancel={() => setConfirmingClear(false)}
+          onConfirm={() => { clearAllData(); setConfirmingClear(false); setClearedMsg(true); }}
         />
       )}
     </div>
