@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   LayoutDashboard, Users, Car, Wrench, CalendarDays, Package, FileText,
   UserCog, LogOut, Plus, Pencil, Trash2, X, AlertTriangle,
-  CheckCircle2, ChevronRight, ArrowLeft, Printer, ClipboardList, Receipt, Hammer, CheckCircle, Wallet, TrendingUp,
+  CheckCircle2, ChevronRight, ArrowLeft, Printer, ClipboardList, Receipt, Hammer, CheckCircle, Wallet, TrendingUp, Menu,
   Download, Upload, KeyRound
 } from 'lucide-react';
 
@@ -385,7 +385,7 @@ function JobForm({ db, initial, onSave, onClose }) {
           <Field label="Job description">
             <textarea style={{ ...inputStyle, minHeight: 60 }} value={description} onChange={(e) => setDescription(e.target.value)} required />
           </Field>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Field label="Status">
               <select style={inputStyle} value={status} onChange={(e) => setStatus(e.target.value)}>
                 {['pending', 'in-progress', 'completed', 'delivered'].map((s) => <option key={s} value={s}>{s}</option>)}
@@ -462,7 +462,7 @@ function InvoiceForm({ db, initial, onSave, onClose }) {
           <Field label="Parts used">
             <PartsChecklist inventory={db.inventory} parts={parts} onChange={setParts} />
           </Field>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Field label="Status">
               <select style={inputStyle} value={status} onChange={(e) => setStatus(e.target.value)}>
                 <option value="unpaid">Unpaid</option>
@@ -522,12 +522,12 @@ function RentalForm({ db, initial, onSave, onClose }) {
               {db.tools.map((t) => <option key={t.id} value={t.id}>{t.name} — {fmtKES(t.dailyRate)}/day</option>)}
             </select>
           </Field>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Field label="Renter name"><input style={inputStyle} value={renterName} onChange={(e) => setRenterName(e.target.value)} required /></Field>
             <Field label="Company / garage"><input style={inputStyle} value={renterCompany} onChange={(e) => setRenterCompany(e.target.value)} /></Field>
           </div>
           <Field label="Phone"><input style={inputStyle} value={renterPhone} onChange={(e) => setRenterPhone(e.target.value)} required /></Field>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Field label="Start date"><input type="date" style={inputStyle} value={startDate} onChange={(e) => setStartDate(e.target.value)} required /></Field>
             <Field label="Expected return"><input type="date" style={inputStyle} value={endDate} onChange={(e) => setEndDate(e.target.value)} required /></Field>
           </div>
@@ -638,6 +638,7 @@ export default function GarageOS() {
   const [saveErr, setSaveErr] = useState(false);
   const [role, setRole] = useState(null); // 'admin' | 'staff'
   const [view, setView] = useState('dashboard');
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [printDoc, setPrintDoc] = useState(null);
   const [unlockedRole, setUnlockedRole] = useState(() => sessionStorage.getItem('kenrover:unlockedRole'));
 
@@ -725,12 +726,20 @@ export default function GarageOS() {
             Couldn't save your last change — check your connection.
           </div>
         )}
+        <div className="md:hidden flex items-center justify-between px-3 py-2.5 shrink-0" style={{ background: C.panel + 'f8', borderBottom: `1px solid ${C.border}` }}>
+          <button onClick={() => setMobileNavOpen(true)} className="p-1.5 rounded-md" style={{ color: C.text }}>
+            <Menu size={22} />
+          </button>
+          <img src={LOGO_BADGE} alt="KenRover Garage" style={{ height: 26 }} />
+          <div style={{ width: 34 }} />
+        </div>
         <div className="flex flex-1 min-h-0">
           <Sidebar
             role={role} view={view} setView={setView}
-            onLogout={() => { setRole(null); sessionStorage.removeItem('kenrover:unlockedRole'); setUnlockedRole(null); }}
+            mobileOpen={mobileNavOpen} onCloseMobile={() => setMobileNavOpen(false)}
+            onLogout={() => { setRole(null); sessionStorage.removeItem('kenrover:unlockedRole'); setUnlockedRole(null); setMobileNavOpen(false); }}
           />
-          <main className="flex-1 p-5 overflow-y-auto">
+          <main className="flex-1 p-3 md:p-5 overflow-y-auto overflow-x-hidden min-w-0">
             <AdminViews view={view} role={role} db={db} addItem={addItem} updateItem={updateItem} deleteItem={deleteItem} setPrintDoc={setPrintDoc} addInvoice={addInvoice} replaceDb={replaceDb} addRental={addRental} clearAllData={clearAllData} />
           </main>
         </div>
@@ -1219,7 +1228,7 @@ function PrintView({ fontImport, doc, db, onClose }) {
 }
 
 
-function Sidebar({ role, view, setView, onLogout }) {
+function Sidebar({ role, view, setView, onLogout, mobileOpen, onCloseMobile }) {
   const groups = ADMIN_NAV_GROUPS
     .filter((g) => g.roles.includes(role))
     .map((g) => ({ ...g, items: g.items.filter((it) => it.roles.includes(role)) }))
@@ -1230,37 +1239,50 @@ function Sidebar({ role, view, setView, onLogout }) {
   const groupGap = dense ? 'mb-3' : 'mb-4';
 
   return (
-    <aside className="w-56 shrink-0 flex flex-col p-3 overflow-y-auto" style={{ background: C.panel + 'e8', backdropFilter: 'blur(4px)', borderRight: `1px solid ${C.border}` }}>
-      <div className="flex items-center px-2 py-3 mb-2 rounded-lg shrink-0" style={{ background: C.panel2, border: `1px solid ${C.border}` }}>
-        <img src={LOGO_BADGE} alt="KenRover Garage" style={{ height: 34, filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.5))' }} />
-      </div>
-      <div className="text-xs px-2 mb-3 uppercase tracking-wide shrink-0" style={{ color: C.dim }}>
-        {role === 'admin' ? 'Admin' : 'Staff'}
-      </div>
-      <nav className="flex-1">
-        {groups.map((group, gi) => (
-          <div key={group.label || gi} className={groupGap}>
-            {group.label && (
-              <div className="px-2.5 mb-1 text-xs uppercase tracking-wider" style={{ color: C.dim, opacity: 0.7 }}>{group.label}</div>
-            )}
-            <div className="flex flex-col gap-0.5">
-              {group.items.map((it) => (
-                <button
-                  key={it.key} onClick={() => setView(it.key)}
-                  className={`flex items-center gap-2.5 ${itemPad} rounded-md text-sm text-left`}
-                  style={{ background: view === it.key ? C.accent + '1f' : 'transparent', color: view === it.key ? C.accent2 : C.text }}
-                >
-                  <it.icon size={16} /> {it.label}
-                </button>
-              ))}
-            </div>
+    <>
+      {mobileOpen && (
+        <div className="fixed inset-0 z-40 md:hidden" style={{ background: '#000000aa' }} onClick={onCloseMobile} />
+      )}
+      <aside
+        className={`w-64 md:w-56 shrink-0 flex flex-col p-3 overflow-y-auto fixed md:static inset-y-0 left-0 z-50 transition-transform duration-200 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}
+        style={{ background: C.panel + 'f8', backdropFilter: 'blur(4px)', borderRight: `1px solid ${C.border}` }}
+      >
+        <div className="flex items-center justify-between gap-2 mb-2 shrink-0">
+          <div className="flex items-center px-2 py-3 rounded-lg flex-1" style={{ background: C.panel2, border: `1px solid ${C.border}` }}>
+            <img src={LOGO_BADGE} alt="KenRover Garage" style={{ height: 34, filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.5))' }} />
           </div>
-        ))}
-      </nav>
-      <button onClick={onLogout} className="flex items-center gap-2.5 px-2.5 py-2 rounded-md text-sm hover:opacity-80 shrink-0" style={{ color: C.dim }}>
-        <LogOut size={16} /> Switch role
-      </button>
-    </aside>
+          <button onClick={onCloseMobile} className="md:hidden p-2 rounded-md shrink-0" style={{ color: C.dim }}>
+            <X size={20} />
+          </button>
+        </div>
+        <div className="text-xs px-2 mb-3 uppercase tracking-wide shrink-0" style={{ color: C.dim }}>
+          {role === 'admin' ? 'Admin' : 'Staff'}
+        </div>
+        <nav className="flex-1">
+          {groups.map((group, gi) => (
+            <div key={group.label || gi} className={groupGap}>
+              {group.label && (
+                <div className="px-2.5 mb-1 text-xs uppercase tracking-wider" style={{ color: C.dim, opacity: 0.7 }}>{group.label}</div>
+              )}
+              <div className="flex flex-col gap-0.5">
+                {group.items.map((it) => (
+                  <button
+                    key={it.key} onClick={() => { setView(it.key); onCloseMobile(); }}
+                    className={`flex items-center gap-2.5 ${itemPad} rounded-md text-sm text-left`}
+                    style={{ background: view === it.key ? C.accent + '1f' : 'transparent', color: view === it.key ? C.accent2 : C.text }}
+                  >
+                    <it.icon size={16} /> {it.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </nav>
+        <button onClick={onLogout} className="flex items-center gap-2.5 px-2.5 py-2 rounded-md text-sm hover:opacity-80 shrink-0" style={{ color: C.dim }}>
+          <LogOut size={16} /> Switch role
+        </button>
+      </aside>
+    </>
   );
 }
 
@@ -1412,7 +1434,7 @@ function ToolHireSection({ db, addItem, updateItem, deleteItem, addRental }) {
       <div className="mb-8">
         <div className="flex items-end justify-between mb-3 flex-wrap gap-2">
           <h3 style={{ fontFamily: FONT_HEAD, color: C.text }} className="text-lg tracking-wide">Rentals</h3>
-          <div className="flex gap-2 items-center">
+          <div className="flex gap-2 items-center flex-wrap">
             <SearchBox value={search} onChange={setSearch} placeholder="Search rentals…" />
             <Button icon={Plus} onClick={() => setRentalModal({ mode: 'add' })}>New rental</Button>
           </div>
