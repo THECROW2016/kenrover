@@ -45,6 +45,15 @@ function seedData() {
     tools: [],
     rentals: [],
     expenses: [],
+    businessProfile: {
+      name: 'KenRover Garage',
+      tagline: 'Full service auto workshop',
+      address: 'Nairobi, Kenya',
+      phone: '+254 700 000 000',
+      email: 'hello@kenrovergarage.example',
+      taxId: '',
+      paymentDetails: '',
+    },
   };
 }
 
@@ -355,8 +364,18 @@ function JobForm({ db, initial, onSave, onClose }) {
   const [assignedStaffId, setAssignedStaffId] = useState(initial?.assignedStaffId || '');
   const [serviceIds, setServiceIds] = useState(initial?.serviceIds || []);
   const [createdDate, setCreatedDate] = useState(initial?.createdDate || new Date().toISOString().slice(0, 10));
+  const [mileage, setMileage] = useState(initial?.mileage ?? '');
   const toggle = (id) => setServiceIds((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
   const total = servicesTotal(db, serviceIds);
+
+  const handleVehicleChange = (id) => {
+    setVehicleId(id);
+    // Prefill with the vehicle's last known mileage as a starting point — new jobs only, and only if not already typed.
+    if (!initial && !mileage) {
+      const v = findName(db.vehicles, id);
+      if (v?.mileage) setMileage(v.mileage);
+    }
+  };
 
   return (
     <div className="fixed inset-0 flex items-center justify-center p-4 z-50" style={{ background: '#000000aa' }}>
@@ -374,11 +393,12 @@ function JobForm({ db, initial, onSave, onClose }) {
               vehicleId: Number(vehicleId), description, status,
               assignedStaffId: assignedStaffId ? Number(assignedStaffId) : null,
               serviceIds, cost: total, createdDate, customerId: veh?.customerId,
+              mileage: mileage === '' ? null : Number(mileage),
             });
           }}
         >
           <Field label="Vehicle">
-            <select style={inputStyle} value={vehicleId} onChange={(e) => setVehicleId(e.target.value)} required>
+            <select style={inputStyle} value={vehicleId} onChange={(e) => handleVehicleChange(e.target.value)} required>
               <option value="">Select…</option>
               {db.vehicles.map((v) => <option key={v.id} value={v.id}>{v.plate} — {v.make} {v.model}</option>)}
             </select>
@@ -399,9 +419,14 @@ function JobForm({ db, initial, onSave, onClose }) {
               </select>
             </Field>
           </div>
-          <Field label="Date opened">
-            <input type="date" style={inputStyle} value={createdDate} onChange={(e) => setCreatedDate(e.target.value)} />
-          </Field>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Field label="Date opened">
+              <input type="date" style={inputStyle} value={createdDate} onChange={(e) => setCreatedDate(e.target.value)} />
+            </Field>
+            <Field label="Mileage at check-in (km)">
+              <input type="number" min="0" style={inputStyle} value={mileage} onChange={(e) => setMileage(e.target.value)} placeholder="e.g. 84500" />
+            </Field>
+          </div>
           <Field label="Services (choose to build the total)">
             <ServiceChecklist services={db.services} selectedIds={serviceIds} onToggle={toggle} />
           </Field>
@@ -663,8 +688,15 @@ export default function App() {
     (async () => {
       try {
         const r = await storage.get('garage_db');
-        if (r && r.value) setDb(JSON.parse(r.value));
-        else { const s = seedData(); setDb(s); await storage.set('garage_db', JSON.stringify(s)); }
+        if (r && r.value) {
+          const loaded = JSON.parse(r.value);
+          // Backfill any fields added after this data was first saved (e.g. businessProfile),
+          // so older saved workspaces don't break when new features are added.
+          const defaults = seedData();
+          setDb({ ...defaults, ...loaded, businessProfile: { ...defaults.businessProfile, ...(loaded.businessProfile || {}) } });
+        } else {
+          const s = seedData(); setDb(s); await storage.set('garage_db', JSON.stringify(s));
+        }
       } catch (e) { setDb(seedData()); }
       setLoading(false);
     })();
@@ -690,6 +722,7 @@ export default function App() {
   };
   const replaceDb = (next) => persist(next);
   const clearAllData = () => persist(seedData());
+  const updateBusinessProfile = (fields) => persist({ ...db, businessProfile: { ...db.businessProfile, ...fields } });
   // Starting a rental also marks the tool as rented; "Mark returned" in ToolHireSection flips it back.
   const addRental = (vals) => {
     const item = { ...vals, id: genId(db.rentals) };
@@ -758,7 +791,7 @@ export default function App() {
             onLogout={() => { setRole(null); sessionStorage.removeItem('kenrover:unlockedRole'); setUnlockedRole(null); setMobileNavOpen(false); }}
           />
           <main className="flex-1 p-3 md:p-5 overflow-y-auto overflow-x-hidden min-w-0">
-            <AdminViews view={view} role={role} db={db} addItem={addItem} updateItem={updateItem} deleteItem={deleteItem} setPrintDoc={setPrintDoc} addInvoice={addInvoice} replaceDb={replaceDb} addRental={addRental} clearAllData={clearAllData} />
+            <AdminViews view={view} role={role} db={db} addItem={addItem} updateItem={updateItem} deleteItem={deleteItem} setPrintDoc={setPrintDoc} addInvoice={addInvoice} replaceDb={replaceDb} addRental={addRental} clearAllData={clearAllData} updateBusinessProfile={updateBusinessProfile} />
           </main>
         </div>
       </div>
@@ -899,12 +932,14 @@ function buildPrintHTML(doc, db) {
   const black = '#1a1a1a';
   let inner = '';
 
+  const bp = db.businessProfile || {};
   const letterhead = (docType, docNumber) => `
     <div style="display:flex;align-items:flex-start;justify-content:space-between;padding-bottom:16px;margin-bottom:20px;border-bottom:2px solid ${black};">
       <div>
-        <img src="${LOGO_BADGE}" alt="KenRover Garage" style="height:46px;margin-bottom:4px;" />
-        <div style="font-size:11px;color:#555;">Full service auto workshop · Nairobi, Kenya</div>
-        <div style="font-size:11px;color:#555;">+254 700 000 000 · hello@kenrovergarage.example</div>
+        <img src="${LOGO_BADGE}" alt="${escapeHtml(bp.name) || 'KenRover Garage'}" style="height:46px;margin-bottom:4px;" />
+        <div style="font-size:11px;color:#555;">${escapeHtml(bp.tagline)}${bp.tagline && bp.address ? ' · ' : ''}${escapeHtml(bp.address)}</div>
+        <div style="font-size:11px;color:#555;">${escapeHtml(bp.phone)}${bp.phone && bp.email ? ' · ' : ''}${escapeHtml(bp.email)}</div>
+        ${bp.taxId ? `<div style="font-size:11px;color:#555;">Tax/KRA PIN: ${escapeHtml(bp.taxId)}</div>` : ''}
       </div>
       <div style="text-align:right;">
         <div style="font-family:'Oswald',sans-serif;font-size:18px;letter-spacing:0.08em;">${docType}</div>
@@ -940,6 +975,11 @@ function buildPrintHTML(doc, db) {
           <div style="color:#888;font-size:10px;text-transform:uppercase;letter-spacing:0.08em;">Assigned mechanic</div>
           <div>${escapeHtml(staff?.name) || 'Unassigned'}</div>
         </div>
+        ${j.mileage ? `
+        <div>
+          <div style="color:#888;font-size:10px;text-transform:uppercase;letter-spacing:0.08em;">Mileage at check-in</div>
+          <div style="font-family:'JetBrains Mono',monospace;">${Number(j.mileage).toLocaleString()} km</div>
+        </div>` : ''}
       </div>
       <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;">Description of work</div>
       <p style="font-size:13px;margin-bottom:16px;">${escapeHtml(j.description)}</p>
@@ -1022,7 +1062,8 @@ function buildPrintHTML(doc, db) {
         </div>
       </div>
       <p style="font-size:11px;color:#888;text-align:center;">
-        ${isReceipt ? 'Payment received with thanks — Kenrover Garage.' : 'Thank you for choosing Kenrover Garage. Payment due on receipt unless otherwise agreed.'}
+        ${isReceipt ? `Payment received with thanks — ${escapeHtml(bp.name) || 'the shop'}.` : `Thank you for choosing ${escapeHtml(bp.name) || 'us'}. Payment due on receipt unless otherwise agreed.`}
+        ${bp.paymentDetails ? `<br/>${escapeHtml(bp.paymentDetails)}` : ''}
       </p>`;
   } else {
     inner = '<p>Nothing to print.</p>';
@@ -1055,13 +1096,14 @@ function buildPrintHTML(doc, db) {
 </html>`;
 }
 
-function PrintLetterhead({ docType, docNumber }) {
+function PrintLetterhead({ docType, docNumber, bp = {} }) {
   return (
     <div className="flex items-start justify-between pb-4 mb-5" style={{ borderBottom: '2px solid #1a1a1a' }}>
       <div>
-        <img src={LOGO_BADGE} alt="KenRover Garage" style={{ height: 46, marginBottom: 4 }} />
-        <div style={{ fontSize: 11, color: '#555' }}>Full service auto workshop · Nairobi, Kenya</div>
-        <div style={{ fontSize: 11, color: '#555' }}>+254 700 000 000 · hello@kenrovergarage.example</div>
+        <img src={LOGO_BADGE} alt={bp.name || 'KenRover Garage'} style={{ height: 46, marginBottom: 4 }} />
+        <div style={{ fontSize: 11, color: '#555' }}>{[bp.tagline, bp.address].filter(Boolean).join(' · ')}</div>
+        <div style={{ fontSize: 11, color: '#555' }}>{[bp.phone, bp.email].filter(Boolean).join(' · ')}</div>
+        {bp.taxId && <div style={{ fontSize: 11, color: '#555' }}>Tax/KRA PIN: {bp.taxId}</div>}
       </div>
       <div className="text-right">
         <div style={{ fontFamily: FONT_HEAD, fontSize: 18, letterSpacing: '0.08em' }}>{docType}</div>
@@ -1122,7 +1164,7 @@ function PrintView({ fontImport, doc, db, onClose }) {
     const services = (j?.serviceIds || []).map((id) => findName(db.services, id)).filter(Boolean);
     body = !j ? <p>Job not found.</p> : (
       <>
-        <PrintLetterhead docType="JOB CARD" docNumber={`JOB-${String(j.id).padStart(4, '0')}`} />
+        <PrintLetterhead docType="JOB CARD" docNumber={`JOB-${String(j.id).padStart(4, "0")}`} bp={db.businessProfile} />
         <div className="grid grid-cols-2 gap-6 mb-5" style={{ fontSize: 13 }}>
           <div>
             <div style={{ color: '#888', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Customer</div>
@@ -1142,6 +1184,12 @@ function PrintView({ fontImport, doc, db, onClose }) {
             <div style={{ color: '#888', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Assigned mechanic</div>
             <div>{staff?.name || 'Unassigned'}</div>
           </div>
+          {j.mileage ? (
+            <div>
+              <div style={{ color: '#888', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Mileage at check-in</div>
+              <div style={{ fontFamily: FONT_MONO }}>{Number(j.mileage).toLocaleString()} km</div>
+            </div>
+          ) : null}
         </div>
         <div style={{ fontSize: 10, color: '#888', textTransform: 'uppercase', letterSpacing: '0.08em' }} className="mb-1">Description of work</div>
         <p style={{ fontSize: 13, marginBottom: 16 }}>{j.description}</p>
@@ -1176,7 +1224,7 @@ function PrintView({ fontImport, doc, db, onClose }) {
     const isReceipt = doc.type === 'receipt';
     body = !inv ? <p>Invoice not found.</p> : (
       <>
-        <PrintLetterhead docType={isReceipt ? 'RECEIPT' : 'INVOICE'} docNumber={`INV-${String(inv.id).padStart(4, '0')}`} />
+        <PrintLetterhead docType={isReceipt ? 'RECEIPT' : 'INVOICE'} docNumber={`INV-${String(inv.id).padStart(4, '0')}`} bp={db.businessProfile} />
         <div className="grid grid-cols-2 gap-6 mb-5" style={{ fontSize: 13 }}>
           <div>
             <div style={{ color: '#888', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Billed to</div>
@@ -1375,6 +1423,7 @@ function JobsSection({ db, addItem, updateItem, deleteItem, setPrintDoc }) {
         columns={[
           { key: 'vehicle', label: 'Vehicle', render: (r) => findName(db.vehicles, r.vehicleId)?.plate || '—' },
           { key: 'description', label: 'Description' },
+          { key: 'mileage', label: 'Mileage', render: (r) => r.mileage ? `${Number(r.mileage).toLocaleString()} km` : '—' },
           { key: 'assigned', label: 'Assigned to', render: (r) => findName(db.staff, r.assignedStaffId)?.name || '—' },
           { key: 'cost', label: 'Cost', render: (r) => fmtKES(r.cost) },
           { key: 'status', label: 'Status', render: (r) => <Badge text={r.status} /> },
@@ -1392,7 +1441,17 @@ function JobsSection({ db, addItem, updateItem, deleteItem, setPrintDoc }) {
         <JobForm
           db={db} initial={modal.item}
           onClose={() => setModal(null)}
-          onSave={(vals) => { modal.mode === 'add' ? addItem('jobs', vals) : updateItem('jobs', modal.item.id, vals); setModal(null); }}
+          onSave={(vals) => {
+            modal.mode === 'add' ? addItem('jobs', vals) : updateItem('jobs', modal.item.id, vals);
+            // Keep the vehicle's on-file mileage current — only moves forward, never backward.
+            if (vals.mileage) {
+              const veh = findName(db.vehicles, vals.vehicleId);
+              if (veh && (!veh.mileage || vals.mileage > veh.mileage)) {
+                updateItem('vehicles', vals.vehicleId, { mileage: vals.mileage });
+              }
+            }
+            setModal(null);
+          }}
         />
       )}
       {pendingDelete !== null && (
@@ -1680,7 +1739,7 @@ function AnalyticsSection({ db }) {
   );
 }
 
-function AdminViews({ view, role, db, addItem, updateItem, deleteItem, setPrintDoc, addInvoice, replaceDb, addRental, clearAllData }) {
+function AdminViews({ view, role, db, addItem, updateItem, deleteItem, setPrintDoc, addInvoice, replaceDb, addRental, clearAllData, updateBusinessProfile }) {
   const ADMIN_ONLY_VIEWS = ['expenses', 'staff', 'settings', 'analytics'];
   if (ADMIN_ONLY_VIEWS.includes(view) && role !== 'admin') {
     return (
@@ -1777,12 +1836,14 @@ function AdminViews({ view, role, db, addItem, updateItem, deleteItem, setPrintD
           { key: 'model', label: 'Model', required: true },
           { key: 'year', label: 'Year', type: 'number', required: true },
           { key: 'plate', label: 'Plate number', required: true },
+          { key: 'mileage', label: 'Current mileage (km)', type: 'number' },
           { key: 'vin', label: 'VIN', wide: true },
         ]}
         columns={[
           { key: 'plate', label: 'Plate', render: (r) => <span style={{ fontFamily: FONT_MONO }}>{r.plate}</span> },
           { key: 'vehicle', label: 'Vehicle', render: (r) => `${r.year} ${r.make} ${r.model}` },
           { key: 'owner', label: 'Owner', render: (r) => findName(db.customers, r.customerId)?.name || '—' },
+          { key: 'mileage', label: 'Mileage', render: (r) => r.mileage ? `${Number(r.mileage).toLocaleString()} km` : '—' },
           { key: 'vin', label: 'VIN' },
         ]}
         onAdd={(v) => addItem('vehicles', { ...v, customerId: Number(v.customerId) })}
@@ -1935,7 +1996,7 @@ function AdminViews({ view, role, db, addItem, updateItem, deleteItem, setPrintD
   }
 
   if (view === 'settings') {
-    return <SettingsSection db={db} replaceDb={replaceDb} clearAllData={clearAllData} />;
+    return <SettingsSection db={db} replaceDb={replaceDb} clearAllData={clearAllData} updateBusinessProfile={updateBusinessProfile} />;
   }
 
   if (view === 'analytics') {
@@ -1979,7 +2040,38 @@ function PinChangeForm({ role }) {
   );
 }
 
-function SettingsSection({ db, replaceDb, clearAllData }) {
+function BusinessProfileForm({ businessProfile, updateBusinessProfile }) {
+  const [form, setForm] = useState(businessProfile || {});
+  const [saved, setSaved] = useState(false);
+  const set = (k, v) => { setForm((p) => ({ ...p, [k]: v })); setSaved(false); };
+
+  return (
+    <form
+      className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-2xl"
+      onSubmit={(e) => { e.preventDefault(); updateBusinessProfile(form); setSaved(true); }}
+    >
+      <div className="sm:col-span-2">
+        <Field label="Business name"><input style={inputStyle} value={form.name || ''} onChange={(e) => set('name', e.target.value)} required /></Field>
+      </div>
+      <div className="sm:col-span-2">
+        <Field label="Tagline (shown on printed documents)"><input style={inputStyle} value={form.tagline || ''} onChange={(e) => set('tagline', e.target.value)} /></Field>
+      </div>
+      <div className="sm:col-span-2">
+        <Field label="Address"><input style={inputStyle} value={form.address || ''} onChange={(e) => set('address', e.target.value)} /></Field>
+      </div>
+      <Field label="Phone"><input style={inputStyle} value={form.phone || ''} onChange={(e) => set('phone', e.target.value)} /></Field>
+      <Field label="Email"><input type="email" style={inputStyle} value={form.email || ''} onChange={(e) => set('email', e.target.value)} /></Field>
+      <Field label="Tax / KRA PIN"><input style={inputStyle} value={form.taxId || ''} onChange={(e) => set('taxId', e.target.value)} /></Field>
+      <Field label="Payment details (e.g. M-Pesa Till, bank account)"><input style={inputStyle} value={form.paymentDetails || ''} onChange={(e) => set('paymentDetails', e.target.value)} /></Field>
+      <div className="sm:col-span-2 flex items-center gap-3">
+        <Button type="submit">Save business profile</Button>
+        {saved && <span className="text-xs flex items-center gap-1" style={{ color: C.success }}><CheckCircle2 size={13} /> Saved</span>}
+      </div>
+    </form>
+  );
+}
+
+function SettingsSection({ db, replaceDb, clearAllData, updateBusinessProfile }) {
   const [importMsg, setImportMsg] = useState(null);
   const [pendingImport, setPendingImport] = useState(null);
   const [confirmingClear, setConfirmingClear] = useState(false);
@@ -2008,8 +2100,8 @@ function SettingsSection({ db, replaceDb, clearAllData }) {
         const required = ['customers', 'vehicles', 'staff', 'services', 'inventory', 'jobs', 'appointments', 'invoices'];
         const missing = required.filter((k) => !Array.isArray(parsed[k]));
         if (missing.length) { setImportMsg({ kind: 'error', text: `That file is missing: ${missing.join(', ')}. Nothing was changed.` }); return; }
-        // Backups made before Tool Hire / Expenses existed won't have these — default them to empty rather than blocking the restore.
-        const withDefaults = { tools: [], rentals: [], expenses: [], ...parsed };
+        // Backups made before Tool Hire / Expenses / Business Profile existed won't have these — default rather than block the restore.
+        const withDefaults = { ...seedData(), ...parsed, businessProfile: { ...seedData().businessProfile, ...(parsed.businessProfile || {}) } };
         setPendingImport(withDefaults);
       } catch (err) {
         setImportMsg({ kind: 'error', text: "Couldn't read that file — make sure it's a KenRover backup JSON export." });
@@ -2027,7 +2119,15 @@ function SettingsSection({ db, replaceDb, clearAllData }) {
 
   return (
     <div>
-      <SectionHeader title="Settings" subtitle="Backups and account access." />
+      <SectionHeader title="Settings" subtitle="Business details, backups, and account access." />
+
+      <div className="mb-8">
+        <h3 style={{ fontFamily: FONT_HEAD, color: C.text }} className="text-lg tracking-wide mb-1">Business profile</h3>
+        <p className="text-xs mb-3" style={{ color: C.dim }}>
+          Shown on printed job cards, invoices, and receipts. Fill this in with your real business details.
+        </p>
+        <BusinessProfileForm businessProfile={db.businessProfile} updateBusinessProfile={updateBusinessProfile} />
+      </div>
 
       <div className="mb-8">
         <h3 style={{ fontFamily: FONT_HEAD, color: C.text }} className="text-lg tracking-wide mb-1">Backup & restore</h3>
