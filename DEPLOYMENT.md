@@ -4,6 +4,10 @@
 
 This app is deployed on **Railway** and requires a backend to run (cannot be deployed to GitHub Pages static hosting).
 
+### Database
+
+Add a Postgres database in Railway (**New → Database → Add PostgreSQL**), then link it to the app service by setting the app's `DATABASE_URL` environment variable to `${{Postgres.DATABASE_URL}}`. Without this, the app falls back to a local file that gets wiped on every redeploy — fine for testing, not for real use. See the main `README.md` → "Deploying on Railway" for the full walkthrough.
+
 ### Domain Configuration
 
 Your custom domain `www.kenroversgms.co.ke` is configured to point to Railway.

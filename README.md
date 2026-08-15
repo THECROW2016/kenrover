@@ -7,28 +7,33 @@ This is a **standalone, full-stack app**: a React (Vite) frontend and a small Ex
 ## Architecture
 
 ```
-┌─────────────┐      HTTP       ┌──────────────┐      file      ┌────────────────┐
-│  React app  │ ───────────────▶│ Express API  │ ─────────────▶ │ data/db.json    │
-│  (src/)     │  GET/PUT /api/db│ (server.js)  │                │ (one JSON doc)  │
+┌─────────────┐      HTTP       ┌──────────────┐                ┌────────────────┐
+│  React app  │ ───────────────▶│ Express API  │ ─────────────▶ │ Postgres        │
+│  (src/)     │  GET/PUT /api/db│ (server.js)  │  (DATABASE_URL) │ (real database) │
 └─────────────┘◀─────────────── └──────────────┘◀─────────────  └────────────────┘
+      │                                │
+      │                                └── no DATABASE_URL set? falls back to a
+      │                                    local JSON file — zero-setup local dev
       │
       └── also caches every read/write in the browser's localStorage,
           so the app keeps working even if the API is briefly unreachable
 ```
 
-One Express process (`server.js`) serves the built frontend **and** the API from the same origin — no separate services, no CORS headaches. The whole app's data is one JSON document (customers, vehicles, jobs, invoices, everything), read and written through two endpoints:
+One Express process (`server.js`) serves the built frontend **and** the API from the same origin — no separate services, no CORS headaches, and it enforces HTTPS in production (see below). The whole app's data is one JSON document (customers, vehicles, jobs, invoices, everything), read and written through two endpoints:
 
 - `GET /api/db` → the stored document, or `null` if nothing's been saved yet
 - `PUT /api/db` → replaces the stored document with the request body
 
-The frontend only ever talks to storage through `src/lib/storage.js` — that's the one file that would need to change if you swap this for a "real" database (Postgres, etc.) later. Everything else in the app has no idea where the data actually lives.
+Storage is auto-detected: if a `DATABASE_URL` environment variable is present, the backend stores that document in a real **Postgres** database (one table, one row, a `jsonb` column — a document store running on real, durable, backed-up infrastructure). If `DATABASE_URL` isn't set, it falls back to a local JSON file, so `npm run dev:server` works instantly with nothing to install.
+
+The frontend only ever talks to storage through `src/lib/storage.js`, and the backend only ever talks to storage through the `storeGet`/`storeSet` functions in `server.js` — those are the two places that would need to change if you later move to proper relational tables instead of one JSON document. Everything else in the app has no idea where the data actually lives.
 
 ## Quick start
 
 **Local development** (two terminals):
 ```bash
 npm install
-npm run dev:server   # terminal 1 — the API, on :8787
+npm run dev:server   # terminal 1 — the API, on :8787 (uses a local JSON file unless DATABASE_URL is set)
 npm run dev          # terminal 2 — the frontend dev server, proxies /api to :8787
 ```
 
@@ -39,20 +44,23 @@ npm run build     # builds the frontend into dist/
 npm run start     # node server.js — serves dist/ AND the API, on $PORT
 ```
 
-### Deploying (e.g. Railway)
+### Deploying on Railway
 
-This repo includes a `railway.json` that already runs `npm run build` then `npm run start` — deploying is just connecting the repo. Two things worth setting up:
+This repo includes a `railway.json` that already runs `npm run build` then `npm run start`. Three things to set up for a real deployment:
 
-1. **Persistent storage.** By default the API writes to `data/db.json` inside the container's filesystem, which most platforms (including Railway) wipe on every redeploy. Add a **volume** mounted at a stable path (e.g. Railway → your service → Settings → Volumes → mount at `/app/data`) and set the environment variable `DATA_DIR=/app/data` so your data survives redeploys.
-2. **Lock down the API.** Set an environment variable `API_KEY` (any long random string) on the backend, and `VITE_API_KEY` (same value) at build time so the frontend sends it automatically. Without this, anyone who finds your URL can read and overwrite all your data — see "Access control" below.
+1. **Add a real Postgres database.** In your Railway project: **New → Database → Add PostgreSQL**. Railway creates a separate Postgres service with its own `DATABASE_URL`. Link it to this app's service by adding an environment variable on the app service: `DATABASE_URL` = `${{Postgres.DATABASE_URL}}` (Railway's variable-reference syntax — pick the Postgres service from the dropdown it offers when you start typing `${{`). The backend detects this automatically on next deploy and creates its table on startup — no manual migration needed.
+2. **HTTPS is automatic.** Railway terminates HTTPS for you on the default `*.up.railway.app` domain — nothing to configure. The backend also actively redirects any stray HTTP request to HTTPS and sends an HSTS header, so even old bookmarked `http://` links get upgraded automatically. If you're using a **custom domain**, add it under your Railway service's Settings → Networking → Custom Domain, then point your domain's DNS at the CNAME target Railway gives you — Railway issues and renews the SSL certificate for it automatically.
+3. **Lock down the API.** Set an environment variable `API_KEY` (any long random string) on the backend, and `VITE_API_KEY` (same value) at build time so the frontend sends it automatically. Without this, anyone who finds your URL can read and overwrite all your data — see "Access control" below.
 
 ## How it stores data — read this before relying on it
 
-Data lives in one JSON file on the server (`data/db.json`), shared across every device that opens the app — this is real, multi-device persistence, not per-browser storage. The browser also keeps a local copy for resilience:
+With `DATABASE_URL` set (the recommended production setup), your data lives in a real Postgres database — durable, automatically backed up by Railway, and genuinely shared across every device that opens the app. Without it, the backend falls back to a single JSON file on the server's disk, which works but won't survive a redeploy unless you also mount a persistent volume.
+
+The browser also keeps a local copy for resilience either way:
 - If the API is briefly unreachable (network hiccup, backend redeploying), the app keeps working against that local copy and syncs the next time a save succeeds.
 - If you open the app somewhere the API has *never* been reachable (e.g. running the frontend alone without the backend), it falls back to that browser's local copy entirely — useful for offline demos, but it means that copy can drift from the server's.
 
-This is a **single JSON document**, not a relational database — fine for one shop's worth of data, but it means every save rewrites the whole document. If you outgrow that (very large datasets, need for concurrent multi-writer conflict resolution, reporting queries, etc.), the natural next step is swapping `data/db.json` for a real database — Postgres is a common choice on Railway — behind the same two endpoints, so the frontend wouldn't need to change at all.
+Even on Postgres, this is currently a **single JSON document** rather than proper relational tables — a deliberate, pragmatic choice so the whole app didn't need a rewrite to get real database durability. It's fine for one shop's worth of data. If you outgrow it (very large datasets, need for concurrent multi-writer conflict resolution, real SQL reporting queries), the natural next step is normalizing into real tables (customers, vehicles, jobs, etc.) behind the same two endpoints — the frontend wouldn't need to change at all, only `storeGet`/`storeSet` in `server.js`.
 
 ## Accounts & access control — also read this before relying on it
 
