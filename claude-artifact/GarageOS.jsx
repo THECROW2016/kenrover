@@ -3,14 +3,14 @@ import {
   LayoutDashboard, Users, Car, Wrench, CalendarDays, Package, FileText,
   UserCog, LogOut, Plus, Pencil, Trash2, X, AlertTriangle,
   CheckCircle2, ChevronRight, ArrowLeft, Printer, ClipboardList, Receipt, Hammer, CheckCircle, Wallet, TrendingUp, Menu,
-  Download, Upload, KeyRound
+  Download, Upload, KeyRound, Calculator
 } from 'lucide-react';
 
 /* ---------------------------------- THEME ---------------------------------- */
 const C = {
-  bg: '#151618', panel: '#1D1F22', panel2: '#26292E', border: '#34373D',
-  text: '#F2F0EA', dim: '#95989F', accent: '#E8590C', accent2: '#F4A927',
-  info: '#5B8DBE', success: '#4C9A6A', danger: '#DD5B5B',
+  bg: '#131415', panel: '#1B1D1F', panel2: '#232629', border: '#32363A',
+  text: '#F3F1EB', dim: '#96999F', accent: '#3FAE5C', accent2: '#F4A927',
+  info: '#5B8DBE', success: '#3FAE5C', danger: '#DD5B5B',
 };
 const FONT_HEAD = "'Oswald', sans-serif";
 const FONT_BODY = "'Inter', sans-serif";
@@ -26,6 +26,7 @@ const STATUS_COLORS = {
   paid: C.success, unpaid: C.danger,
   available: C.success, rented: C.accent2, maintenance: C.danger,
   active: C.info, returned: C.success, overdue: C.danger,
+  draft: C.dim, sent: C.info, approved: C.success, declined: C.danger,
 };
 
 /* --------------------------------- SEED DATA --------------------------------- */
@@ -44,6 +45,7 @@ function seedData() {
     tools: [],
     rentals: [],
     expenses: [],
+    estimates: [],
     businessProfile: {
       name: 'KenRover Garage',
       tagline: 'Full service auto workshop',
@@ -327,6 +329,43 @@ function ServiceChecklist({ services, selectedIds, onToggle }) {
   );
 }
 
+function LineItemsTable({ items, onChange, hasCode }) {
+  const set = (idx, key, val) => onChange(items.map((it, i) => (i === idx ? { ...it, [key]: val } : it)));
+  const addRow = () => onChange([...items, { code: '', description: '', qty: 1, discPct: 0, unitCost: 0 }]);
+  const removeRow = (idx) => onChange(items.filter((_, i) => i !== idx));
+  const lineTotal = (it) => (Number(it.qty) || 0) * (Number(it.unitCost) || 0) * (1 - (Number(it.discPct) || 0) / 100);
+
+  return (
+    <div className="flex flex-col gap-2">
+      {items.map((it, idx) => (
+        <div key={idx} className="flex flex-wrap gap-2 items-end p-2 rounded-md" style={{ background: C.panel2, border: `1px solid ${C.border}` }}>
+          {hasCode && (
+            <div style={{ width: 80 }}>
+              <Field label="Code"><input style={inputStyle} value={it.code || ''} onChange={(e) => set(idx, 'code', e.target.value)} /></Field>
+            </div>
+          )}
+          <div style={{ flex: '1 1 160px' }}>
+            <Field label="Description"><input style={inputStyle} value={it.description || ''} onChange={(e) => set(idx, 'description', e.target.value)} /></Field>
+          </div>
+          <div style={{ width: 64 }}>
+            <Field label="Qty"><input type="number" min="0" style={inputStyle} value={it.qty} onChange={(e) => set(idx, 'qty', Number(e.target.value))} /></Field>
+          </div>
+          <div style={{ width: 64 }}>
+            <Field label="Disc %"><input type="number" min="0" max="100" style={inputStyle} value={it.discPct} onChange={(e) => set(idx, 'discPct', Number(e.target.value))} /></Field>
+          </div>
+          <div style={{ width: 100 }}>
+            <Field label="Unit cost"><input type="number" min="0" style={inputStyle} value={it.unitCost} onChange={(e) => set(idx, 'unitCost', Number(e.target.value))} /></Field>
+          </div>
+          <div style={{ width: 90, textAlign: 'right', fontFamily: FONT_MONO, fontSize: 12, color: C.dim, paddingBottom: 8 }}>{fmtKES(lineTotal(it))}</div>
+          <button type="button" onClick={() => removeRow(idx)} style={{ paddingBottom: 8 }}><X size={14} color={C.danger} /></button>
+        </div>
+      ))}
+      <Button type="button" variant="ghost" small icon={Plus} onClick={addRow}>Add line</Button>
+    </div>
+  );
+}
+const lineItemsTotal = (items) => (items || []).reduce((s, it) => s + (Number(it.qty) || 0) * (Number(it.unitCost) || 0) * (1 - (Number(it.discPct) || 0) / 100), 0);
+
 function PartsChecklist({ inventory, parts, onChange }) {
   const qtyOf = (id) => parts.find((p) => p.inventoryId === id)?.qty || 0;
   const setQty = (id, qty) => {
@@ -563,6 +602,109 @@ function RentalForm({ db, initial, onSave, onClose }) {
           </Field>
           <div className="p-2.5 rounded-md text-sm" style={{ background: C.accent + '17', border: `1px solid ${C.accent}44` }}>
             <div className="flex justify-between" style={{ color: C.dim }}><span>{days} day{days === 1 ? '' : 's'} × {fmtKES(dailyRate)}</span></div>
+            <div className="flex justify-between mt-1" style={{ color: C.text, fontWeight: 600 }}><span>Total</span><span style={{ fontFamily: FONT_MONO, color: C.accent2 }}>{fmtKES(total)}</span></div>
+          </div>
+          <div className="flex justify-end gap-2 mt-1">
+            <Button variant="ghost" onClick={onClose}>Cancel</Button>
+            <Button type="submit">Save</Button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function EstimateForm({ db, initial, onSave, onClose }) {
+  const [customerId, setCustomerId] = useState(initial?.customerId || '');
+  const [vehicleId, setVehicleId] = useState(initial?.vehicleId || '');
+  const [date, setDate] = useState(initial?.date || new Date().toISOString().slice(0, 10));
+  const [estimateNo, setEstimateNo] = useState(initial?.estimateNo || '');
+  const [accountName, setAccountName] = useState(initial?.accountName || '');
+  const [orderNo, setOrderNo] = useState(initial?.orderNo || '');
+  const [parts, setParts] = useState(initial?.parts || []);
+  const [labour, setLabour] = useState(initial?.labour || []);
+  const [vatRate, setVatRate] = useState(initial?.vatRate ?? 0);
+  const [status, setStatus] = useState(initial?.status || 'draft');
+
+  const custVehicles = db.vehicles.filter((v) => v.customerId === Number(customerId));
+  const partsTotal = lineItemsTotal(parts);
+  const labourTotal = lineItemsTotal(labour);
+  const netTotal = partsTotal + labourTotal;
+  const vatAmount = netTotal * ((Number(vatRate) || 0) / 100);
+  const total = netTotal + vatAmount;
+
+  const handleCustomerChange = (id) => {
+    setCustomerId(id);
+    if (!accountName) { const c = findName(db.customers, id); if (c) setAccountName(c.name); }
+  };
+
+  return (
+    <div className="fixed inset-0 flex items-center justify-center p-4 z-50" style={{ background: '#000000aa' }}>
+      <div className="w-full max-w-2xl rounded-lg p-5 max-h-[88vh] overflow-y-auto" style={{ background: C.panel, border: `1px solid ${C.border}` }}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 style={{ fontFamily: FONT_HEAD, color: C.text }} className="text-xl tracking-wide">{initial ? 'Edit Estimate' : 'New Estimate'}</h3>
+          <button onClick={onClose}><X size={18} color={C.dim} /></button>
+        </div>
+        <form
+          className="flex flex-col gap-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            onSave({
+              customerId: Number(customerId), vehicleId: vehicleId ? Number(vehicleId) : null,
+              date, estimateNo, accountName, orderNo, parts, labour,
+              vatRate: Number(vatRate) || 0, partsTotal, labourTotal, netTotal, vatAmount, total, status,
+            });
+          }}
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Field label="Customer">
+              <select style={inputStyle} value={customerId} onChange={(e) => handleCustomerChange(e.target.value)} required>
+                <option value="">Select…</option>
+                {db.customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </Field>
+            <Field label="Vehicle">
+              <select style={inputStyle} value={vehicleId} onChange={(e) => setVehicleId(e.target.value)}>
+                <option value="">Select…</option>
+                {custVehicles.map((v) => <option key={v.id} value={v.id}>{v.plate} — {v.make} {v.model}</option>)}
+              </select>
+            </Field>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Field label="Estimate No."><input style={inputStyle} value={estimateNo} onChange={(e) => setEstimateNo(e.target.value)} placeholder="e.g. 1076" /></Field>
+            <Field label="Date"><input type="date" style={inputStyle} value={date} onChange={(e) => setDate(e.target.value)} /></Field>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Field label="Account name"><input style={inputStyle} value={accountName} onChange={(e) => setAccountName(e.target.value)} /></Field>
+            <Field label="Order No. (optional)"><input style={inputStyle} value={orderNo} onChange={(e) => setOrderNo(e.target.value)} /></Field>
+          </div>
+
+          <div className="mt-1">
+            <div className="text-xs uppercase tracking-wide mb-1.5" style={{ color: C.dim }}>Parts</div>
+            <LineItemsTable items={parts} onChange={setParts} hasCode />
+          </div>
+          <div className="mt-1">
+            <div className="text-xs uppercase tracking-wide mb-1.5" style={{ color: C.dim }}>Labour</div>
+            <LineItemsTable items={labour} onChange={setLabour} />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Field label="VAT rate (%)"><input type="number" min="0" style={inputStyle} value={vatRate} onChange={(e) => setVatRate(e.target.value)} /></Field>
+            <Field label="Status">
+              <select style={inputStyle} value={status} onChange={(e) => setStatus(e.target.value)}>
+                <option value="draft">Draft</option>
+                <option value="sent">Sent to customer</option>
+                <option value="approved">Approved</option>
+                <option value="declined">Declined</option>
+              </select>
+            </Field>
+          </div>
+
+          <div className="p-2.5 rounded-md text-sm" style={{ background: C.accent + '17', border: `1px solid ${C.accent}44` }}>
+            <div className="flex justify-between" style={{ color: C.dim }}><span>Parts</span><span style={{ fontFamily: FONT_MONO }}>{fmtKES(partsTotal)}</span></div>
+            <div className="flex justify-between" style={{ color: C.dim }}><span>Labour</span><span style={{ fontFamily: FONT_MONO }}>{fmtKES(labourTotal)}</span></div>
+            <div className="flex justify-between" style={{ color: C.dim }}><span>Net total</span><span style={{ fontFamily: FONT_MONO }}>{fmtKES(netTotal)}</span></div>
+            {vatRate > 0 && <div className="flex justify-between" style={{ color: C.dim }}><span>VAT ({vatRate}%)</span><span style={{ fontFamily: FONT_MONO }}>{fmtKES(vatAmount)}</span></div>}
             <div className="flex justify-between mt-1" style={{ color: C.text, fontWeight: 600 }}><span>Total</span><span style={{ fontFamily: FONT_MONO, color: C.accent2 }}>{fmtKES(total)}</span></div>
           </div>
           <div className="flex justify-end gap-2 mt-1">
@@ -894,6 +1036,7 @@ const ADMIN_NAV_GROUPS = [
     { key: 'inventory', label: 'Inventory', icon: Package, roles: ['admin', 'staff'] },
   ] },
   { label: 'Finance', roles: ['admin', 'staff'], items: [
+    { key: 'estimates', label: 'Estimates', icon: Calculator, roles: ['admin', 'staff'] },
     { key: 'invoices', label: 'Invoices', icon: FileText, roles: ['admin', 'staff'] },
     { key: 'expenses', label: 'Expenses', icon: Wallet, roles: ['admin'] },
     { key: 'toolhire', label: 'Tool Hire', icon: Hammer, roles: ['admin', 'staff'] },
@@ -1035,6 +1178,85 @@ function buildPrintHTML(doc, db) {
         ${isReceipt ? `Payment received with thanks — ${escapeHtml(bp.name) || 'the shop'}.` : `Thank you for choosing ${escapeHtml(bp.name) || 'us'}. Payment due on receipt unless otherwise agreed.`}
         ${bp.paymentDetails ? `<br/>${escapeHtml(bp.paymentDetails)}` : ''}
       </p>`;
+  } else if (doc.type === 'estimate') {
+    const est = findName(db.estimates, doc.id);
+    if (!est) return '<p>Estimate not found.</p>';
+    const v = est.vehicleId ? findName(db.vehicles, est.vehicleId) : null;
+    const cust = findName(db.customers, est.customerId);
+    const lineRow = (it, withCode) => `<tr style="border-bottom:1px solid #ddd;">
+      ${withCode ? `<td style="padding:6px 4px 6px 0;font-family:'JetBrains Mono',monospace;font-size:12px;">${escapeHtml(it.code)}</td>` : ''}
+      <td style="text-align:center;padding:6px 4px;">${it.qty}</td>
+      <td style="padding:6px 4px;">${escapeHtml(it.description)}</td>
+      <td style="text-align:center;padding:6px 4px;">${it.discPct || 0}</td>
+      <td style="text-align:right;padding:6px 4px;font-family:'JetBrains Mono',monospace;">${fmtKES(it.unitCost)}</td>
+      <td style="text-align:right;padding:6px 0;font-family:'JetBrains Mono',monospace;">${fmtKES((Number(it.qty) || 0) * (Number(it.unitCost) || 0) * (1 - (Number(it.discPct) || 0) / 100))}</td>
+    </tr>`;
+    const partsRows = (est.parts || []).map((it) => lineRow(it, true)).join('');
+    const labourRows = (est.labour || []).map((it) => lineRow(it, false)).join('');
+    inner = `
+      ${letterhead('ESTIMATE', `No. ${est.estimateNo || String(est.id).padStart(4, '0')}${est.accountName ? ' — Account: ' + escapeHtml(est.accountName) : ''}`)}
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:20px;font-size:13px;">
+        <div>
+          <div style="color:#888;font-size:10px;text-transform:uppercase;letter-spacing:0.08em;">To</div>
+          <div style="font-weight:600;">${escapeHtml(cust?.name) || '—'}</div>
+          <div>${escapeHtml(cust?.address)}</div>
+          <div>${escapeHtml(cust?.phone)}</div>
+        </div>
+        <div>
+          <div style="color:#888;font-size:10px;text-transform:uppercase;letter-spacing:0.08em;">Date</div>
+          <div>${escapeHtml(est.date)}</div>
+          ${est.orderNo ? `<div style="margin-top:6px;color:#888;font-size:10px;text-transform:uppercase;letter-spacing:0.08em;">Order No.</div><div>${escapeHtml(est.orderNo)}</div>` : ''}
+        </div>
+      </div>
+      ${partsRows ? `
+      <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;">Parts</div>
+      <table style="width:100%;margin-bottom:16px;font-size:12px;border-collapse:collapse;">
+        <thead><tr style="border-bottom:2px solid ${black};">
+          <th style="text-align:left;padding:6px 4px 6px 0;font-size:10px;text-transform:uppercase;color:#888;">Code</th>
+          <th style="text-align:center;padding:6px 4px;font-size:10px;text-transform:uppercase;color:#888;">Qty</th>
+          <th style="text-align:left;padding:6px 4px;font-size:10px;text-transform:uppercase;color:#888;">Description</th>
+          <th style="text-align:center;padding:6px 4px;font-size:10px;text-transform:uppercase;color:#888;">Disc %</th>
+          <th style="text-align:right;padding:6px 4px;font-size:10px;text-transform:uppercase;color:#888;">Unit Cost</th>
+          <th style="text-align:right;padding:6px 0;font-size:10px;text-transform:uppercase;color:#888;">Total</th>
+        </tr></thead>
+        <tbody>${partsRows}</tbody>
+      </table>` : ''}
+      ${labourRows ? `
+      <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;">Labour</div>
+      <table style="width:100%;margin-bottom:20px;font-size:12px;border-collapse:collapse;">
+        <thead><tr style="border-bottom:2px solid ${black};">
+          <th style="text-align:center;padding:6px 4px;font-size:10px;text-transform:uppercase;color:#888;">Qty</th>
+          <th style="text-align:left;padding:6px 4px;font-size:10px;text-transform:uppercase;color:#888;">Description</th>
+          <th style="text-align:center;padding:6px 4px;font-size:10px;text-transform:uppercase;color:#888;">Disc %</th>
+          <th style="text-align:right;padding:6px 4px;font-size:10px;text-transform:uppercase;color:#888;">Unit Cost</th>
+          <th style="text-align:right;padding:6px 0;font-size:10px;text-transform:uppercase;color:#888;">Total</th>
+        </tr></thead>
+        <tbody>${labourRows}</tbody>
+      </table>` : ''}
+      <div style="display:flex;justify-content:space-between;gap:20px;margin-bottom:24px;">
+        <div style="font-size:12px;">
+          ${v ? `
+          <div style="color:#888;font-size:10px;text-transform:uppercase;letter-spacing:0.08em;">Vehicle</div>
+          <div>Registration: <b>${escapeHtml(v.plate)}</b></div>
+          <div>Make: ${escapeHtml(v.make)}</div>
+          <div>Model: ${escapeHtml(v.model)}</div>
+          ${v.mileage ? `<div>Mileage: ${Number(v.mileage).toLocaleString()}</div>` : ''}
+          ${v.engineSize ? `<div>Engine Size: ${v.engineSize}</div>` : ''}
+          ` : ''}
+        </div>
+        <div style="width:220px;">
+          <div style="display:flex;justify-content:space-between;font-size:12px;padding:2px 0;"><span>Parts</span><span style="font-family:'JetBrains Mono',monospace;">${fmtKES(est.partsTotal)}</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:12px;padding:2px 0;"><span>Labour</span><span style="font-family:'JetBrains Mono',monospace;">${fmtKES(est.labourTotal)}</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:12px;padding:2px 0;border-top:1px solid #ddd;margin-top:2px;padding-top:6px;"><span>Net Total</span><span style="font-family:'JetBrains Mono',monospace;">${fmtKES(est.netTotal)}</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:12px;padding:2px 0;"><span>Total VAT</span><span style="font-family:'JetBrains Mono',monospace;">${fmtKES(est.vatAmount)}</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:14px;font-weight:700;border-top:2px solid ${black};padding-top:8px;margin-top:4px;">
+            <span>Total</span><span style="font-family:'JetBrains Mono',monospace;">${fmtKES(est.total)}</span>
+          </div>
+          <div style="font-size:10px;color:#888;text-align:right;margin-top:2px;">ESTIMATE E&amp;OE</div>
+        </div>
+      </div>
+      ${bp.paymentDetails ? `<p style="font-size:11px;text-align:center;font-weight:600;">${escapeHtml(bp.paymentDetails)}</p>` : ''}
+      <p style="font-size:11px;color:#888;text-align:center;">Thank you for your custom.</p>`;
   } else {
     inner = '<p>Nothing to print.</p>';
   }
@@ -1243,6 +1465,97 @@ function PrintView({ fontImport, doc, db, onClose }) {
         <p style={{ fontSize: 11, color: '#888', textAlign: 'center' }}>
           {isReceipt ? 'Payment received with thanks — Kenrover Garage.' : 'Thank you for choosing Kenrover Garage. Payment due on receipt unless otherwise agreed.'}
         </p>
+      </>
+    );
+  }
+
+  if (doc.type === 'estimate') {
+    const est = findName(db.estimates, doc.id);
+    const v = est?.vehicleId ? findName(db.vehicles, est.vehicleId) : null;
+    const cust = est && findName(db.customers, est.customerId);
+    const lineRow = (it, idx, withCode) => (
+      <tr key={idx} style={line}>
+        {withCode && <td style={{ padding: '6px 4px 6px 0', fontFamily: FONT_MONO, fontSize: 12 }}>{it.code}</td>}
+        <td style={{ textAlign: 'center', padding: '6px 4px' }}>{it.qty}</td>
+        <td style={{ padding: '6px 4px' }}>{it.description}</td>
+        <td style={{ textAlign: 'center', padding: '6px 4px' }}>{it.discPct || 0}</td>
+        <td style={{ textAlign: 'right', padding: '6px 4px', fontFamily: FONT_MONO }}>{fmtKES(it.unitCost)}</td>
+        <td style={{ textAlign: 'right', padding: '6px 0', fontFamily: FONT_MONO }}>{fmtKES((Number(it.qty) || 0) * (Number(it.unitCost) || 0) * (1 - (Number(it.discPct) || 0) / 100))}</td>
+      </tr>
+    );
+    body = !est ? <p>Estimate not found.</p> : (
+      <>
+        <PrintLetterhead docType="ESTIMATE" docNumber={`No. ${est.estimateNo || String(est.id).padStart(4, '0')}`} bp={db.businessProfile} />
+        <div className="grid grid-cols-2 gap-6 mb-5" style={{ fontSize: 13 }}>
+          <div>
+            <div style={{ color: '#888', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em' }}>To</div>
+            <div style={{ fontWeight: 600 }}>{cust?.name || '—'}</div>
+            <div>{cust?.address}</div>
+            <div>{cust?.phone}</div>
+          </div>
+          <div>
+            <div style={{ color: '#888', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Date</div>
+            <div>{est.date}</div>
+            {est.orderNo && <><div style={{ marginTop: 6, color: '#888', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Order No.</div><div>{est.orderNo}</div></>}
+          </div>
+        </div>
+        {est.parts?.length > 0 && (
+          <>
+            <div style={{ fontSize: 10, color: '#888', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>Parts</div>
+            <table className="w-full mb-4" style={{ fontSize: 12, borderCollapse: 'collapse' }}>
+              <thead><tr style={{ borderBottom: `2px solid ${black}` }}>
+                <th style={{ textAlign: 'left', padding: '6px 4px 6px 0', fontSize: 10, textTransform: 'uppercase', color: '#888' }}>Code</th>
+                <th style={{ textAlign: 'center', padding: '6px 4px', fontSize: 10, textTransform: 'uppercase', color: '#888' }}>Qty</th>
+                <th style={{ textAlign: 'left', padding: '6px 4px', fontSize: 10, textTransform: 'uppercase', color: '#888' }}>Description</th>
+                <th style={{ textAlign: 'center', padding: '6px 4px', fontSize: 10, textTransform: 'uppercase', color: '#888' }}>Disc %</th>
+                <th style={{ textAlign: 'right', padding: '6px 4px', fontSize: 10, textTransform: 'uppercase', color: '#888' }}>Unit Cost</th>
+                <th style={{ textAlign: 'right', padding: '6px 0', fontSize: 10, textTransform: 'uppercase', color: '#888' }}>Total</th>
+              </tr></thead>
+              <tbody>{est.parts.map((it, i) => lineRow(it, i, true))}</tbody>
+            </table>
+          </>
+        )}
+        {est.labour?.length > 0 && (
+          <>
+            <div style={{ fontSize: 10, color: '#888', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>Labour</div>
+            <table className="w-full mb-5" style={{ fontSize: 12, borderCollapse: 'collapse' }}>
+              <thead><tr style={{ borderBottom: `2px solid ${black}` }}>
+                <th style={{ textAlign: 'center', padding: '6px 4px', fontSize: 10, textTransform: 'uppercase', color: '#888' }}>Qty</th>
+                <th style={{ textAlign: 'left', padding: '6px 4px', fontSize: 10, textTransform: 'uppercase', color: '#888' }}>Description</th>
+                <th style={{ textAlign: 'center', padding: '6px 4px', fontSize: 10, textTransform: 'uppercase', color: '#888' }}>Disc %</th>
+                <th style={{ textAlign: 'right', padding: '6px 4px', fontSize: 10, textTransform: 'uppercase', color: '#888' }}>Unit Cost</th>
+                <th style={{ textAlign: 'right', padding: '6px 0', fontSize: 10, textTransform: 'uppercase', color: '#888' }}>Total</th>
+              </tr></thead>
+              <tbody>{est.labour.map((it, i) => lineRow(it, i, false))}</tbody>
+            </table>
+          </>
+        )}
+        <div className="flex justify-between gap-5 mb-6">
+          <div style={{ fontSize: 12 }}>
+            {v && (
+              <>
+                <div style={{ color: '#888', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Vehicle</div>
+                <div>Registration: <b>{v.plate}</b></div>
+                <div>Make: {v.make}</div>
+                <div>Model: {v.model}</div>
+                {v.mileage ? <div>Mileage: {Number(v.mileage).toLocaleString()}</div> : null}
+                {v.engineSize ? <div>Engine Size: {v.engineSize}</div> : null}
+              </>
+            )}
+          </div>
+          <div style={{ width: 220 }}>
+            <div className="flex justify-between" style={{ fontSize: 12, padding: '2px 0' }}><span>Parts</span><span style={{ fontFamily: FONT_MONO }}>{fmtKES(est.partsTotal)}</span></div>
+            <div className="flex justify-between" style={{ fontSize: 12, padding: '2px 0' }}><span>Labour</span><span style={{ fontFamily: FONT_MONO }}>{fmtKES(est.labourTotal)}</span></div>
+            <div className="flex justify-between" style={{ fontSize: 12, padding: '2px 0', borderTop: '1px solid #ddd', marginTop: 2, paddingTop: 6 }}><span>Net Total</span><span style={{ fontFamily: FONT_MONO }}>{fmtKES(est.netTotal)}</span></div>
+            <div className="flex justify-between" style={{ fontSize: 12, padding: '2px 0' }}><span>Total VAT</span><span style={{ fontFamily: FONT_MONO }}>{fmtKES(est.vatAmount)}</span></div>
+            <div className="flex justify-between" style={{ fontSize: 14, fontWeight: 700, borderTop: `2px solid ${black}`, paddingTop: 8, marginTop: 4 }}>
+              <span>Total</span><span style={{ fontFamily: FONT_MONO }}>{fmtKES(est.total)}</span>
+            </div>
+            <div style={{ fontSize: 10, color: '#888', textAlign: 'right', marginTop: 2 }}>ESTIMATE E&OE</div>
+          </div>
+        </div>
+        {db.businessProfile?.paymentDetails && <p style={{ fontSize: 11, textAlign: 'center', fontWeight: 600 }}>{db.businessProfile.paymentDetails}</p>}
+        <p style={{ fontSize: 11, color: '#888', textAlign: 'center' }}>Thank you for your custom.</p>
       </>
     );
   }
@@ -1462,6 +1775,53 @@ function InvoicesSection({ db, addItem, updateItem, deleteItem, setPrintDoc, add
           message="Delete this invoice? This can't be undone. (Stock already deducted for its parts won't be restored automatically.)"
           onCancel={() => setPendingDelete(null)}
           onConfirm={() => { deleteItem('invoices', pendingDelete); setPendingDelete(null); }}
+        />
+      )}
+    </div>
+  );
+}
+
+function EstimatesSection({ db, addItem, updateItem, deleteItem, setPrintDoc }) {
+  const [modal, setModal] = useState(null);
+  const [pendingDelete, setPendingDelete] = useState(null);
+  const [search, setSearch] = useState('');
+  return (
+    <div>
+      <SectionHeader
+        title="Estimates" subtitle="Quotes for customers, before the work is billed."
+        action={<div className="flex gap-2 items-center flex-wrap"><SearchBox value={search} onChange={setSearch} placeholder="Search estimates…" /><Button icon={Plus} onClick={() => setModal({ mode: 'add' })}>New estimate</Button></div>}
+      />
+      <DataTable
+        empty="No estimates yet."
+        columns={[
+          { key: 'estimateNo', label: 'Estimate #', render: (r) => <span style={{ fontFamily: FONT_MONO }}>{r.estimateNo || `EST-${String(r.id).padStart(4, '0')}`}</span> },
+          { key: 'customer', label: 'Customer', render: (r) => findName(db.customers, r.customerId)?.name || '—' },
+          { key: 'vehicle', label: 'Vehicle', render: (r) => findName(db.vehicles, r.vehicleId)?.plate || '—' },
+          { key: 'date', label: 'Date' },
+          { key: 'total', label: 'Total', render: (r) => fmtKES(r.total) },
+          { key: 'status', label: 'Status', render: (r) => <Badge text={r.status} /> },
+          { key: 'print', label: '', render: (r) => (
+            <button title="Print estimate" onClick={() => setPrintDoc({ type: 'estimate', id: r.id })} className="p-1.5 rounded hover:opacity-70">
+              <Printer size={14} color={C.dim} />
+            </button>
+          ) },
+        ]}
+        data={filterRows(db.estimates, search)}
+        onEdit={(item) => setModal({ mode: 'edit', item })}
+        onDelete={(id) => setPendingDelete(id)}
+      />
+      {modal && (
+        <EstimateForm
+          db={db} initial={modal.item}
+          onClose={() => setModal(null)}
+          onSave={(vals) => { modal.mode === 'add' ? addItem('estimates', vals) : updateItem('estimates', modal.item.id, vals); setModal(null); }}
+        />
+      )}
+      {pendingDelete !== null && (
+        <ConfirmDialog
+          message="Delete this estimate? This can't be undone."
+          onCancel={() => setPendingDelete(null)}
+          onConfirm={() => { deleteItem('estimates', pendingDelete); setPendingDelete(null); }}
         />
       )}
     </div>
@@ -1788,6 +2148,7 @@ function AdminViews({ view, role, db, addItem, updateItem, deleteItem, setPrintD
           { key: 'year', label: 'Year', type: 'number', required: true },
           { key: 'plate', label: 'Plate number', required: true },
           { key: 'mileage', label: 'Current mileage (km)', type: 'number' },
+          { key: 'engineSize', label: 'Engine size (cc)', type: 'number' },
           { key: 'vin', label: 'VIN', wide: true },
         ]}
         columns={[
@@ -1883,6 +2244,10 @@ function AdminViews({ view, role, db, addItem, updateItem, deleteItem, setPrintD
         onDelete={(id) => deleteItem('inventory', id)}
       />
     );
+  }
+
+  if (view === 'estimates') {
+    return <EstimatesSection db={db} addItem={addItem} updateItem={updateItem} deleteItem={deleteItem} setPrintDoc={setPrintDoc} />;
   }
 
   if (view === 'invoices') {
