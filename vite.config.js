@@ -3,6 +3,9 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
+  // GitHub Pages serves this project at /kenroveros/, not at the domain root.
+  // Without this, the built index.html requests /assets/... which 404s.
+  base: process.env.GITHUB_PAGES === 'true' ? '/kenroveros/' : '/',
   server: {
     proxy: {
       // In dev, the Vite server (npm run dev) and the API server
